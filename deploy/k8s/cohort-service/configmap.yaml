@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cohort-service-config
+  namespace: cohort
+data:
+  # Server config
+  SERVER_HOST: "0.0.0.0"
+  SERVER_PORT: "8080"
+  SERVER_READ_TIMEOUT: "30s"
+  SERVER_WRITE_TIMEOUT: "30s"
+
+  # PostgreSQL config
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "cohort"
+  POSTGRES_DATABASE: "cohort"
+  POSTGRES_SSL_MODE: "disable"
+  POSTGRES_MAX_OPEN_CONNS: "25"
+  POSTGRES_MAX_IDLE_CONNS: "5"
+
+  # ClickHouse config
+  CLICKHOUSE_HOST: "clickhouse"
+  CLICKHOUSE_PORT: "9000"
+  CLICKHOUSE_USER: "default"
+  CLICKHOUSE_DATABASE: "cohort"
+  CLICKHOUSE_MAX_OPEN_CONNS: "10"
+  CLICKHOUSE_MAX_IDLE_CONNS: "5"
+
+  # Kafka config
+  KAFKA_BROKERS: "kafka:9092"
+  KAFKA_EVENTS_TOPIC: "events.raw"
+  KAFKA_COHORTS_TOPIC: "cohort.definitions"
+  KAFKA_CHANGES_TOPIC: "cohort.changes"
+  KAFKA_CONSUMER_GROUP: "cohort-service"
+
+  # Redis config
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_POOL_SIZE: "10"
+  REDIS_CACHE_TTL: "5m"
+
+  # Flink config
+  FLINK_HOST: "flink-jobmanager"
+  FLINK_PORT: "8081"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cohort-service-secrets
+  namespace: cohort
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "cohort"
+  CLICKHOUSE_PASSWORD: ""
+  REDIS_PASSWORD: ""

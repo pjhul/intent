@@ -1,0 +1,203 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-config
+  namespace: cohort
+data:
+  flink-conf.yaml: |
+    jobmanager.rpc.address: flink-jobmanager
+    jobmanager.rpc.port: 6123
+    jobmanager.memory.process.size: 1024m
+    taskmanager.memory.process.size: 2048m
+    taskmanager.numberOfTaskSlots: 2
+    parallelism.default: 1
+    state.backend: hashmap
+    state.checkpoints.dir: file:///flink-data/checkpoints
+    state.savepoints.dir: file:///flink-data/savepoints
+    rest.port: 8081
+    rest.address: 0.0.0.0
+    web.upload.dir: /opt/flink/jars
+    blob.fetch.retries: 10
+    blob.fetch.num-concurrent: 10
+    blob.client.socket.timeout: 300000
+    blob.server.port: 6124
+    classloader.resolve-order: parent-first
+    pipeline.classpaths: /opt/flink/usrlib/cohort-processor-1.0.0.jar
+  log4j-console.properties: |
+    rootLogger.level = INFO
+    rootLogger.appenderRef.console.ref = ConsoleAppender
+    appender.console.name = ConsoleAppender
+    appender.console.type = Console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = %d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %-60c %x - %m%n
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-jobmanager
+  namespace: cohort
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink
+      component: jobmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: jobmanager
+    spec:
+      initContainers:
+      - name: copy-jar
+        image: cohort-flink:latest
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'cp /opt/flink/usrlib/*.jar /shared-usrlib/']
+        volumeMounts:
+        - name: flink-usrlib
+          mountPath: /shared-usrlib
+      containers:
+      - name: jobmanager
+        image: flink:1.18-java11
+        args: ["jobmanager"]
+        ports:
+        - containerPort: 6123
+          name: rpc
+        - containerPort: 8081
+          name: webui
+        env:
+        - name: JOB_MANAGER_RPC_ADDRESS
+          value: flink-jobmanager
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: flink-config
+          mountPath: /opt/flink/conf/flink-conf.yaml
+          subPath: flink-conf.yaml
+        - name: flink-config
+          mountPath: /opt/flink/conf/log4j-console.properties
+          subPath: log4j-console.properties
+        - name: flink-data
+          mountPath: /flink-data
+        - name: flink-usrlib
+          mountPath: /opt/flink/usrlib
+        readinessProbe:
+          httpGet:
+            path: /overview
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /overview
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: flink-config
+        configMap:
+          name: flink-config
+      - name: flink-data
+        emptyDir: {}
+      - name: flink-usrlib
+        persistentVolumeClaim:
+          claimName: flink-usrlib
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-taskmanager
+  namespace: cohort
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink
+      component: taskmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: taskmanager
+    spec:
+      containers:
+      - name: taskmanager
+        image: flink:1.18-java11
+        args: ["taskmanager"]
+        ports:
+        - containerPort: 6121
+          name: data
+        - containerPort: 6122
+          name: rpc
+        env:
+        - name: JOB_MANAGER_RPC_ADDRESS
+          value: flink-jobmanager
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        volumeMounts:
+        - name: flink-config
+          mountPath: /opt/flink/conf/flink-conf.yaml
+          subPath: flink-conf.yaml
+        - name: flink-config
+          mountPath: /opt/flink/conf/log4j-console.properties
+          subPath: log4j-console.properties
+        - name: flink-data
+          mountPath: /flink-data
+        - name: flink-usrlib
+          mountPath: /opt/flink/usrlib
+      volumes:
+      - name: flink-config
+        configMap:
+          name: flink-config
+      - name: flink-data
+        emptyDir: {}
+      - name: flink-usrlib
+        persistentVolumeClaim:
+          claimName: flink-usrlib
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager
+  namespace: cohort
+spec:
+  selector:
+    app: flink
+    component: jobmanager
+  ports:
+  - port: 6123
+    targetPort: 6123
+    name: rpc
+  - port: 8081
+    targetPort: 8081
+    name: webui
+    nodePort: 30081
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-taskmanager
+  namespace: cohort
+spec:
+  selector:
+    app: flink
+    component: taskmanager
+  ports:
+  - port: 6121
+    targetPort: 6121
+    name: data
+  - port: 6122
+    targetPort: 6122
+    name: rpc

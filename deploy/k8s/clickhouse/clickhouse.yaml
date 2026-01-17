@@ -1,0 +1,129 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-init
+  namespace: cohort
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS cohort;
+
+    CREATE TABLE IF NOT EXISTS cohort.events_raw (
+        id UUID DEFAULT generateUUIDv4(),
+        user_id String,
+        event_name LowCardinality(String),
+        properties String,
+        timestamp DateTime64(3, 'UTC'),
+        received_at DateTime64(3, 'UTC') DEFAULT now64(3),
+        event_date Date DEFAULT toDate(timestamp)
+    ) ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(event_date)
+    ORDER BY (user_id, event_name, timestamp)
+    TTL event_date + INTERVAL 365 DAY
+    SETTINGS index_granularity = 8192;
+
+    CREATE TABLE IF NOT EXISTS cohort.cohort_membership (
+        cohort_id UUID,
+        user_id String,
+        sign Int8,
+        joined_at DateTime64(3, 'UTC'),
+        updated_at DateTime64(3, 'UTC') DEFAULT now64(3),
+        version UInt64
+    ) ENGINE = CollapsingMergeTree(sign)
+    ORDER BY (cohort_id, user_id)
+    SETTINGS index_granularity = 8192;
+
+    CREATE TABLE IF NOT EXISTS cohort.cohort_membership_changelog (
+        id UUID DEFAULT generateUUIDv4(),
+        cohort_id UUID,
+        user_id String,
+        prev_status Int8,
+        new_status Int8,
+        changed_at DateTime64(3, 'UTC') DEFAULT now64(3),
+        trigger_event_id Nullable(UUID),
+        change_date Date DEFAULT toDate(changed_at)
+    ) ENGINE = MergeTree()
+    PARTITION BY toYYYYMM(change_date)
+    ORDER BY (cohort_id, user_id, changed_at)
+    TTL change_date + INTERVAL 90 DAY
+    SETTINGS index_granularity = 8192;
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  namespace: cohort
+spec:
+  serviceName: clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+    spec:
+      containers:
+      - name: clickhouse
+        image: clickhouse/clickhouse-server:24.1
+        ports:
+        - containerPort: 8123
+          name: http
+        - containerPort: 9000
+          name: native
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "1"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/clickhouse
+        - name: init
+          mountPath: /docker-entrypoint-initdb.d
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: init
+        configMap:
+          name: clickhouse-init
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: cohort
+spec:
+  selector:
+    app: clickhouse
+  ports:
+  - port: 8123
+    targetPort: 8123
+    name: http
+    nodePort: 30123
+  - port: 9000
+    targetPort: 9000
+    name: native
+    nodePort: 30900
+  type: NodePort
