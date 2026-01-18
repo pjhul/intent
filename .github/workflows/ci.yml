@@ -1,4 +1,4 @@
-name: Cohort Service Tests
+name: CI
 
 on:
   push:
