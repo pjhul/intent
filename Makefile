@@ -30,6 +30,7 @@ generate-mocks:
 	mockgen -source=internal/db/querier.go -destination=internal/mocks/mock_db.go -package=mocks
 	mockgen -source=internal/domain/cohort/recompute_worker.go -destination=internal/mocks/mock_clickhouse.go -package=mocks
 	mockgen -source=internal/domain/cohort/service.go -destination=internal/mocks/mock_producer.go -package=mocks
+	mockgen -source=internal/inserter/interfaces.go -destination=internal/mocks/mock_inserter.go -package=mocks
 
 clean:
 	rm -rf bin/

@@ -10,11 +10,16 @@ import (
 
 // EventsInserter handles batch insertion of events into ClickHouse
 type EventsInserter struct {
-	client *clickhouse.Client
+	client BatchPreparer
 }
 
 // NewEventsInserter creates a new events inserter
 func NewEventsInserter(client *clickhouse.Client) *EventsInserter {
+	return &EventsInserter{client: &clickhouseBatchPreparer{client: client}}
+}
+
+// NewEventsInserterWithClient creates a new events inserter with a custom BatchPreparer (for testing)
+func NewEventsInserterWithClient(client BatchPreparer) *EventsInserter {
 	return &EventsInserter{client: client}
 }
 
