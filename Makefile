@@ -1,4 +1,4 @@
-.PHONY: all build build-inserter build-all test clean docker docker-inserter flink-build flink-docker up down logs logs-inserter flink-run flink-cancel inserter-restart
+.PHONY: all build build-inserter build-all test test-coverage test-coverage-html clean docker docker-inserter flink-build flink-docker up down logs logs-inserter flink-run flink-cancel inserter-restart generate-mocks
 
 # Variables
 APP_NAME := cohort-service
@@ -17,6 +17,19 @@ build-all: build build-inserter
 
 test:
 	go test -v ./...
+
+test-coverage:
+	go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -func=coverage.out
+
+test-coverage-html: test-coverage
+	go tool cover -html=coverage.out -o coverage.html
+
+generate-mocks:
+	go install go.uber.org/mock/mockgen@v0.5.0
+	mockgen -source=internal/db/querier.go -destination=internal/mocks/mock_db.go -package=mocks
+	mockgen -source=internal/domain/cohort/recompute_worker.go -destination=internal/mocks/mock_clickhouse.go -package=mocks
+	mockgen -source=internal/domain/cohort/service.go -destination=internal/mocks/mock_producer.go -package=mocks
 
 clean:
 	rm -rf bin/

@@ -149,7 +149,7 @@ func (w *RecomputeWorker) executeJob(ctx context.Context, job *RecomputeJob) {
 	}
 
 	// Calculate diff
-	toAdd, toRemove := w.calculateDiff(matchingUsers, currentMembers)
+	toAdd, toRemove := w.CalculateDiff(matchingUsers, currentMembers)
 	job.Progress.TotalUsers = int64(len(toAdd) + len(toRemove))
 	w.updateJob(job)
 
@@ -219,8 +219,8 @@ func (w *RecomputeWorker) getCurrentMembers(ctx context.Context, cohortID uuid.U
 	return members, nil
 }
 
-// calculateDiff calculates which users need to be added or removed
-func (w *RecomputeWorker) calculateDiff(matchingUsers, currentMembers map[string]struct{}) (toAdd, toRemove []string) {
+// CalculateDiff calculates which users need to be added or removed
+func (w *RecomputeWorker) CalculateDiff(matchingUsers, currentMembers map[string]struct{}) (toAdd, toRemove []string) {
 	// Users to add: in matchingUsers but not in currentMembers
 	for userID := range matchingUsers {
 		if _, exists := currentMembers[userID]; !exists {

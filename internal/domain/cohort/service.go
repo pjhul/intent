@@ -19,7 +19,7 @@ var (
 
 // Service handles cohort business logic
 type Service struct {
-	queries         *db.Queries
+	queries         db.Querier
 	kafkaProducer   CohortProducer
 	recomputeWorker *RecomputeWorker
 }
@@ -31,7 +31,7 @@ type CohortProducer interface {
 }
 
 // NewService creates a new cohort service
-func NewService(queries *db.Queries, producer CohortProducer) *Service {
+func NewService(queries db.Querier, producer CohortProducer) *Service {
 	return &Service{
 		queries:       queries,
 		kafkaProducer: producer,
