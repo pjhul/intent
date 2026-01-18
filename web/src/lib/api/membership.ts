@@ -1,6 +1,14 @@
 import { api } from './client';
 import type { Member, UserCohort, PaginatedResponse } from './types';
 
+function getCohortBasePath(orgSlug: string, projectSlug: string): string {
+	return `/api/v1/organizations/${orgSlug}/projects/${projectSlug}/cohorts`;
+}
+
+function getUserBasePath(orgSlug: string, projectSlug: string): string {
+	return `/api/v1/organizations/${orgSlug}/projects/${projectSlug}/users`;
+}
+
 // API response format from backend
 interface MembersApiResponse {
 	cohort_id: string;
@@ -11,6 +19,8 @@ interface MembersApiResponse {
 }
 
 export async function getCohortMembers(
+	orgSlug: string,
+	projectSlug: string,
 	cohortId: string,
 	page: number = 1,
 	pageSize: number = 50
@@ -20,7 +30,7 @@ export async function getCohortMembers(
 		limit: pageSize.toString(),
 		offset: offset.toString()
 	});
-	const response = await api<MembersApiResponse>(`/api/v1/cohorts/${cohortId}/members?${params}`);
+	const response = await api<MembersApiResponse>(`${getCohortBasePath(orgSlug, projectSlug)}/${cohortId}/members?${params}`);
 
 	// Transform backend response to frontend format
 	return {
@@ -31,13 +41,18 @@ export async function getCohortMembers(
 	};
 }
 
-export async function getUserCohorts(userId: string): Promise<UserCohort[]> {
-	return api<UserCohort[]>(`/api/v1/users/${userId}/cohorts`);
+export async function getUserCohorts(orgSlug: string, projectSlug: string, userId: string): Promise<UserCohort[]> {
+	return api<UserCohort[]>(`${getUserBasePath(orgSlug, projectSlug)}/${userId}/cohorts`);
 }
 
 export async function checkUserMembership(
+	orgSlug: string,
+	projectSlug: string,
 	cohortId: string,
 	userId: string
 ): Promise<{ is_member: boolean }> {
-	return api<{ is_member: boolean }>(`/api/v1/cohorts/${cohortId}/members/${userId}`);
+	return api<{ is_member: boolean }>(`${getCohortBasePath(orgSlug, projectSlug)}/${cohortId}/check`, {
+		method: 'POST',
+		body: JSON.stringify({ user_id: userId })
+	});
 }

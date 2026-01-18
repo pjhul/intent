@@ -1,6 +1,7 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { Cohort, CohortStatus } from '$lib/api/types';
 import { listCohorts } from '$lib/api/cohorts';
+import { currentOrganization, currentProject } from './context';
 
 function createCohortsStore() {
 	const { subscribe, set, update } = writable<Cohort[]>([]);
@@ -10,7 +11,26 @@ function createCohortsStore() {
 		set,
 		async load() {
 			try {
-				const cohorts = await listCohorts();
+				const org = get(currentOrganization);
+				const project = get(currentProject);
+
+				if (!org || !project) {
+					console.warn('Cannot load cohorts without org/project context');
+					set([]);
+					return [];
+				}
+
+				const cohorts = await listCohorts(org.slug, project.slug);
+				set(cohorts);
+				return cohorts;
+			} catch (error) {
+				console.error('Failed to load cohorts:', error);
+				throw error;
+			}
+		},
+		async loadWithContext(orgSlug: string, projectSlug: string) {
+			try {
+				const cohorts = await listCohorts(orgSlug, projectSlug);
 				set(cohorts);
 				return cohorts;
 			} catch (error) {

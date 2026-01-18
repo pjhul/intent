@@ -1,7 +1,9 @@
 import { api } from './client';
 import type { Cohort, CreateCohortRequest, UpdateCohortRequest, CohortStats, RecomputeResponse, RecomputeJob } from './types';
 
-const BASE_PATH = '/api/v1/cohorts';
+function getBasePath(orgSlug: string, projectSlug: string): string {
+	return `/api/v1/organizations/${orgSlug}/projects/${projectSlug}/cohorts`;
+}
 
 interface ListCohortsResponse {
 	cohorts: Cohort[];
@@ -9,58 +11,58 @@ interface ListCohortsResponse {
 	offset: number;
 }
 
-export async function listCohorts(): Promise<Cohort[]> {
-	const response = await api<ListCohortsResponse>(BASE_PATH);
+export async function listCohorts(orgSlug: string, projectSlug: string): Promise<Cohort[]> {
+	const response = await api<ListCohortsResponse>(getBasePath(orgSlug, projectSlug));
 	return response.cohorts;
 }
 
-export async function getCohort(id: string): Promise<Cohort> {
-	return api<Cohort>(`${BASE_PATH}/${id}`);
+export async function getCohort(orgSlug: string, projectSlug: string, id: string): Promise<Cohort> {
+	return api<Cohort>(`${getBasePath(orgSlug, projectSlug)}/${id}`);
 }
 
-export async function createCohort(data: CreateCohortRequest): Promise<Cohort> {
-	return api<Cohort>(BASE_PATH, {
+export async function createCohort(orgSlug: string, projectSlug: string, data: CreateCohortRequest): Promise<Cohort> {
+	return api<Cohort>(getBasePath(orgSlug, projectSlug), {
 		method: 'POST',
 		body: JSON.stringify(data)
 	});
 }
 
-export async function updateCohort(id: string, data: UpdateCohortRequest): Promise<Cohort> {
-	return api<Cohort>(`${BASE_PATH}/${id}`, {
+export async function updateCohort(orgSlug: string, projectSlug: string, id: string, data: UpdateCohortRequest): Promise<Cohort> {
+	return api<Cohort>(`${getBasePath(orgSlug, projectSlug)}/${id}`, {
 		method: 'PUT',
 		body: JSON.stringify(data)
 	});
 }
 
-export async function deleteCohort(id: string): Promise<void> {
-	return api<void>(`${BASE_PATH}/${id}`, {
+export async function deleteCohort(orgSlug: string, projectSlug: string, id: string): Promise<void> {
+	return api<void>(`${getBasePath(orgSlug, projectSlug)}/${id}`, {
 		method: 'DELETE'
 	});
 }
 
-export async function activateCohort(id: string): Promise<Cohort> {
-	return api<Cohort>(`${BASE_PATH}/${id}/activate`, {
+export async function activateCohort(orgSlug: string, projectSlug: string, id: string): Promise<Cohort> {
+	return api<Cohort>(`${getBasePath(orgSlug, projectSlug)}/${id}/activate`, {
 		method: 'POST'
 	});
 }
 
-export async function deactivateCohort(id: string): Promise<Cohort> {
-	return api<Cohort>(`${BASE_PATH}/${id}/deactivate`, {
+export async function deactivateCohort(orgSlug: string, projectSlug: string, id: string): Promise<Cohort> {
+	return api<Cohort>(`${getBasePath(orgSlug, projectSlug)}/${id}/deactivate`, {
 		method: 'POST'
 	});
 }
 
-export async function getCohortStats(id: string): Promise<CohortStats> {
-	return api<CohortStats>(`${BASE_PATH}/${id}/stats`);
+export async function getCohortStats(orgSlug: string, projectSlug: string, id: string): Promise<CohortStats> {
+	return api<CohortStats>(`${getBasePath(orgSlug, projectSlug)}/${id}/stats`);
 }
 
-export async function recomputeCohort(id: string, force?: boolean): Promise<RecomputeResponse> {
-	return api<RecomputeResponse>(`${BASE_PATH}/${id}/recompute`, {
+export async function recomputeCohort(orgSlug: string, projectSlug: string, id: string, force?: boolean): Promise<RecomputeResponse> {
+	return api<RecomputeResponse>(`${getBasePath(orgSlug, projectSlug)}/${id}/recompute`, {
 		method: 'POST',
 		body: JSON.stringify({ force: force ?? false })
 	});
 }
 
-export async function getRecomputeStatus(cohortId: string, jobId: string): Promise<RecomputeJob> {
-	return api<RecomputeJob>(`${BASE_PATH}/${cohortId}/recompute/${jobId}`);
+export async function getRecomputeStatus(orgSlug: string, projectSlug: string, cohortId: string, jobId: string): Promise<RecomputeJob> {
+	return api<RecomputeJob>(`${getBasePath(orgSlug, projectSlug)}/${cohortId}/recompute/${jobId}`);
 }

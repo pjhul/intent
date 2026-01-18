@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/pjhul/intent/internal/api/middleware"
 	"github.com/pjhul/intent/internal/domain/cohort"
 )
 
@@ -19,9 +20,15 @@ func NewCohortHandler(service *cohort.Service) *CohortHandler {
 	return &CohortHandler{service: service}
 }
 
-// List returns all cohorts with pagination
-// GET /cohorts
+// List returns all cohorts for a project with pagination
+// GET /organizations/:orgSlug/projects/:projectSlug/cohorts
 func (h *CohortHandler) List(c *gin.Context) {
+	projectID, ok := middleware.GetProjectID(c)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "project not resolved"})
+		return
+	}
+
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
@@ -29,7 +36,7 @@ func (h *CohortHandler) List(c *gin.Context) {
 		limit = 100
 	}
 
-	cohorts, err := h.service.List(c.Request.Context(), limit, offset)
+	cohorts, err := h.service.List(c.Request.Context(), projectID, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -43,7 +50,7 @@ func (h *CohortHandler) List(c *gin.Context) {
 }
 
 // Get retrieves a specific cohort by ID
-// GET /cohorts/:id
+// GET /organizations/:orgSlug/projects/:projectSlug/cohorts/:id
 func (h *CohortHandler) Get(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -65,15 +72,21 @@ func (h *CohortHandler) Get(c *gin.Context) {
 }
 
 // Create creates a new cohort
-// POST /cohorts
+// POST /organizations/:orgSlug/projects/:projectSlug/cohorts
 func (h *CohortHandler) Create(c *gin.Context) {
+	projectID, ok := middleware.GetProjectID(c)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "project not resolved"})
+		return
+	}
+
 	var req cohort.CreateCohortRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	coh, err := h.service.Create(c.Request.Context(), req)
+	coh, err := h.service.Create(c.Request.Context(), projectID, req)
 	if err != nil {
 		if err == cohort.ErrInvalidRules {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid cohort rules"})
@@ -87,7 +100,7 @@ func (h *CohortHandler) Create(c *gin.Context) {
 }
 
 // Update updates an existing cohort
-// PUT /cohorts/:id
+// PUT /organizations/:orgSlug/projects/:projectSlug/cohorts/:id
 func (h *CohortHandler) Update(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -119,7 +132,7 @@ func (h *CohortHandler) Update(c *gin.Context) {
 }
 
 // Delete deletes a cohort
-// DELETE /cohorts/:id
+// DELETE /organizations/:orgSlug/projects/:projectSlug/cohorts/:id
 func (h *CohortHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -140,7 +153,7 @@ func (h *CohortHandler) Delete(c *gin.Context) {
 }
 
 // Activate activates a cohort
-// POST /cohorts/:id/activate
+// POST /organizations/:orgSlug/projects/:projectSlug/cohorts/:id/activate
 func (h *CohortHandler) Activate(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -162,7 +175,7 @@ func (h *CohortHandler) Activate(c *gin.Context) {
 }
 
 // Deactivate deactivates a cohort
-// POST /cohorts/:id/deactivate
+// POST /organizations/:orgSlug/projects/:projectSlug/cohorts/:id/deactivate
 func (h *CohortHandler) Deactivate(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -184,7 +197,7 @@ func (h *CohortHandler) Deactivate(c *gin.Context) {
 }
 
 // Recompute triggers a recompute job for a cohort
-// POST /cohorts/:id/recompute
+// POST /organizations/:orgSlug/projects/:projectSlug/cohorts/:id/recompute
 func (h *CohortHandler) Recompute(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -216,7 +229,7 @@ func (h *CohortHandler) Recompute(c *gin.Context) {
 }
 
 // GetRecomputeStatus retrieves the status of a recompute job
-// GET /cohorts/:id/recompute/:jobId
+// GET /organizations/:orgSlug/projects/:projectSlug/cohorts/:id/recompute/:jobId
 func (h *CohortHandler) GetRecomputeStatus(c *gin.Context) {
 	_, err := uuid.Parse(c.Param("id"))
 	if err != nil {

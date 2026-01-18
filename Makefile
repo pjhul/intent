@@ -8,6 +8,7 @@ all: build
 
 # Go targets
 build:
+	@touch internal/infrastructure/migrations/migrations.go
 	go build -o bin/$(APP_NAME) ./cmd/cohort-service
 
 build-inserter:
@@ -42,6 +43,7 @@ generate:
 
 # Docker targets
 docker:
+	@touch internal/infrastructure/migrations/migrations.go
 	docker build -t $(APP_NAME):$(VERSION) .
 
 docker-inserter:
@@ -99,7 +101,8 @@ flink-restart: flink-docker
 	@echo "Flink restarted. Submit job with: make flink-run"
 
 # Rebuild and restart cohort-service only
-service-restart: docker
+service-restart:
+	docker compose build cohort-service
 	docker compose up -d --force-recreate cohort-service
 
 # Rebuild and restart inserter-service only

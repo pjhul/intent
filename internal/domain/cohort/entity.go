@@ -104,6 +104,7 @@ const (
 // Cohort represents a cohort definition
 type Cohort struct {
 	ID          uuid.UUID    `json:"id"`
+	ProjectID   uuid.UUID    `json:"project_id"`
 	Name        string       `json:"name"`
 	Description string       `json:"description,omitempty"`
 	Rules       Rules        `json:"rules"`

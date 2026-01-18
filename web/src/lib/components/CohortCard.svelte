@@ -5,12 +5,14 @@
 
 	export let cohort: Cohort;
 	export let memberCount: number | undefined = undefined;
+	export let baseUrl: string = '';
 
+	$: cohortUrl = baseUrl ? `${baseUrl}/cohorts/${cohort.id}` : `/cohorts/${cohort.id}`;
 	$: updatedAgo = formatDistanceToNow(new Date(cohort.updated_at), { addSuffix: true });
 </script>
 
 <a
-	href="/cohorts/{cohort.id}"
+	href={cohortUrl}
 	class="card p-4 hover:border-blue-300 hover:shadow-md transition-all block"
 >
 	<div class="flex items-start justify-between gap-4">

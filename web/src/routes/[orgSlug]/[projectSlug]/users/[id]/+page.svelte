@@ -6,6 +6,8 @@
 	import type { UserCohort } from '$lib/api/types';
 	import { format } from 'date-fns';
 
+	$: orgSlug = $page.params.orgSlug;
+	$: projectSlug = $page.params.projectSlug;
 	$: userId = decodeURIComponent($page.params.id);
 
 	let cohorts: UserCohort[] = [];
@@ -16,7 +18,7 @@
 		loading = true;
 		error = null;
 		try {
-			cohorts = await getUserCohorts(userId);
+			cohorts = await getUserCohorts(orgSlug, projectSlug, userId);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load user cohorts';
 		} finally {
@@ -34,9 +36,9 @@
 <div class="p-6 max-w-4xl mx-auto">
 	<!-- Breadcrumb -->
 	<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
-		<a href="/" class="hover:text-gray-700">Dashboard</a>
+		<a href="/{orgSlug}/{projectSlug}" class="hover:text-gray-700">Dashboard</a>
 		<span>/</span>
-		<a href="/users/lookup" class="hover:text-gray-700">User Lookup</a>
+		<a href="/{orgSlug}/{projectSlug}/users/lookup" class="hover:text-gray-700">User Lookup</a>
 		<span>/</span>
 		<span class="truncate max-w-xs">{userId}</span>
 	</div>
@@ -47,7 +49,7 @@
 				<h1 class="text-2xl font-bold text-gray-900">User Details</h1>
 				<p class="mt-1 text-sm text-gray-500 font-mono break-all">{userId}</p>
 			</div>
-			<a href="/users/lookup" class="btn btn-secondary">
+			<a href="/{orgSlug}/{projectSlug}/users/lookup" class="btn btn-secondary">
 				<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
 						stroke-linecap="round"
@@ -127,7 +129,7 @@
 								<tr class="hover:bg-gray-50">
 									<td class="px-4 py-3">
 										<a
-											href="/cohorts/{cohort.cohort_id}"
+											href="/{orgSlug}/{projectSlug}/cohorts/{cohort.cohort_id}"
 											class="text-blue-600 hover:text-blue-800 hover:underline font-medium"
 										>
 											{cohort.cohort_name}

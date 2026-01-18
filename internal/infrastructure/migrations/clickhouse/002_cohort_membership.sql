@@ -12,12 +12,13 @@ CREATE TABLE IF NOT EXISTS cohort.cohort_membership (
 ORDER BY (cohort_id, user_id)
 SETTINGS index_granularity = 8192;
 
--- Table for current membership state using ReplacingMergeTree
+-- Table for current membership state using CollapsingMergeTree
 CREATE TABLE IF NOT EXISTS cohort.cohort_membership_current (
     cohort_id UUID,
     user_id String,
+    sign Int8,
     joined_at DateTime64(3, 'UTC'),
     updated_at DateTime64(3, 'UTC')
-) ENGINE = ReplacingMergeTree(updated_at)
+) ENGINE = CollapsingMergeTree(sign)
 ORDER BY (cohort_id, user_id)
 SETTINGS index_granularity = 8192;

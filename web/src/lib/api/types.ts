@@ -1,9 +1,55 @@
 // TypeScript types matching Go entities
 
+// Organization represents an organization entity
+export interface Organization {
+	id: string;
+	name: string;
+	slug: string;
+	description?: string;
+	created_at: string;
+	updated_at: string;
+}
+
+// Project represents a project within an organization
+export interface Project {
+	id: string;
+	organization_id: string;
+	name: string;
+	slug: string;
+	description?: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface CreateOrganizationRequest {
+	name: string;
+	slug: string;
+	description?: string;
+}
+
+export interface UpdateOrganizationRequest {
+	name?: string;
+	slug?: string;
+	description?: string;
+}
+
+export interface CreateProjectRequest {
+	name: string;
+	slug: string;
+	description?: string;
+}
+
+export interface UpdateProjectRequest {
+	name?: string;
+	slug?: string;
+	description?: string;
+}
+
 export type CohortStatus = 'active' | 'inactive' | 'draft';
 
 export interface Cohort {
 	id: string;
+	project_id: string;
 	name: string;
 	description?: string;
 	rules: Rules;
