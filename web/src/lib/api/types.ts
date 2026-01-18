@@ -96,3 +96,30 @@ export interface CohortStats {
 	member_count: number;
 	last_computed_at?: string;
 }
+
+export type RecomputeStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface RecomputeProgress {
+	total_users: number;
+	processed_users: number;
+	members_found: number;
+	members_added: number;
+	members_removed: number;
+}
+
+export interface RecomputeJob {
+	id: string;
+	cohort_id: string;
+	status: RecomputeStatus;
+	progress: RecomputeProgress;
+	started_at: string;
+	completed_at?: string;
+	error?: string;
+}
+
+export interface RecomputeResponse {
+	job_id: string;
+	cohort_id: string;
+	status: RecomputeStatus;
+	message?: string;
+}

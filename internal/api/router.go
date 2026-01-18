@@ -61,6 +61,8 @@ func (r *Router) SetupRoutes(engine *gin.Engine) {
 			cohorts.DELETE("/:id", r.cohortHandler.Delete)
 			cohorts.POST("/:id/activate", r.cohortHandler.Activate)
 			cohorts.POST("/:id/deactivate", r.cohortHandler.Deactivate)
+			cohorts.POST("/:id/recompute", r.cohortHandler.Recompute)
+			cohorts.GET("/:id/recompute/:jobId", r.cohortHandler.GetRecomputeStatus)
 			cohorts.POST("/:id/check", r.membershipHandler.CheckMembership)
 			cohorts.GET("/:id/members", r.membershipHandler.GetCohortMembers)
 			cohorts.GET("/:id/stats", r.membershipHandler.GetCohortStats)

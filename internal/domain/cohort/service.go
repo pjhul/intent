@@ -11,14 +11,17 @@ import (
 )
 
 var (
-	ErrCohortNotFound = errors.New("cohort not found")
-	ErrInvalidRules   = errors.New("invalid cohort rules")
+	ErrCohortNotFound       = errors.New("cohort not found")
+	ErrInvalidRules         = errors.New("invalid cohort rules")
+	ErrRecomputeInProgress  = errors.New("recompute already in progress")
+	ErrRecomputeJobNotFound = errors.New("recompute job not found")
 )
 
 // Service handles cohort business logic
 type Service struct {
-	queries       *db.Queries
-	kafkaProducer CohortProducer
+	queries         *db.Queries
+	kafkaProducer   CohortProducer
+	recomputeWorker *RecomputeWorker
 }
 
 // CohortProducer interface for publishing cohort updates
@@ -33,6 +36,12 @@ func NewService(queries *db.Queries, producer CohortProducer) *Service {
 		queries:       queries,
 		kafkaProducer: producer,
 	}
+}
+
+// SetRecomputeWorker sets the recompute worker for the service
+// This is called after service creation to avoid circular dependencies
+func (s *Service) SetRecomputeWorker(worker *RecomputeWorker) {
+	s.recomputeWorker = worker
 }
 
 // Create creates a new cohort
@@ -168,6 +177,13 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateCohortRequ
 
 // Activate activates a cohort
 func (s *Service) Activate(ctx context.Context, id uuid.UUID) (*Cohort, error) {
+	// Check if this is first activation (transitioning from draft)
+	existing, err := s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	isFirstActivation := existing.Status == CohortStatusDraft
+
 	pgID := pgtype.UUID{Bytes: id, Valid: true}
 	dbCohort, err := s.queries.UpdateCohortStatus(ctx, db.UpdateCohortStatusParams{
 		ID:     pgID,
@@ -181,6 +197,11 @@ func (s *Service) Activate(ctx context.Context, id uuid.UUID) (*Cohort, error) {
 
 	if s.kafkaProducer != nil {
 		s.kafkaProducer.ProduceCohortDefinition(ctx, cohort)
+	}
+
+	// Trigger recompute on first activation
+	if isFirstActivation && s.recomputeWorker != nil {
+		go s.TriggerRecompute(context.Background(), id, false)
 	}
 
 	return cohort, nil
@@ -234,4 +255,48 @@ func dbCohortToDomain(c db.Cohort) *Cohort {
 		CreatedAt:   c.CreatedAt.Time,
 		UpdatedAt:   c.UpdatedAt.Time,
 	}
+}
+
+// TriggerRecompute triggers a recompute job for a cohort
+func (s *Service) TriggerRecompute(ctx context.Context, cohortID uuid.UUID, force bool) (*RecomputeResponse, error) {
+	// Verify cohort exists
+	cohort, err := s.GetByID(ctx, cohortID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if worker is available
+	if s.recomputeWorker == nil {
+		return nil, errors.New("recompute worker not available")
+	}
+
+	// Check if there's already a running job for this cohort (unless force is set)
+	if !force && s.recomputeWorker.HasRunningJob(cohortID) {
+		return nil, ErrRecomputeInProgress
+	}
+
+	// Create and submit the job
+	job := NewRecomputeJob(cohortID)
+	s.recomputeWorker.SubmitJob(job)
+
+	return &RecomputeResponse{
+		JobID:    job.ID,
+		CohortID: cohort.ID,
+		Status:   job.Status,
+		Message:  "Recompute job started",
+	}, nil
+}
+
+// GetRecomputeJob retrieves the status of a recompute job
+func (s *Service) GetRecomputeJob(ctx context.Context, jobID uuid.UUID) (*RecomputeJob, error) {
+	if s.recomputeWorker == nil {
+		return nil, errors.New("recompute worker not available")
+	}
+
+	job, ok := s.recomputeWorker.GetJob(jobID)
+	if !ok {
+		return nil, ErrRecomputeJobNotFound
+	}
+
+	return job, nil
 }

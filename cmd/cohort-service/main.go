@@ -86,6 +86,15 @@ func main() {
 
 	// Initialize services
 	cohortService := cohort.NewService(queries, &kafkaProducerAdapter{kafkaProducer})
+
+	// Initialize recompute worker
+	recomputeWorker := cohort.NewRecomputeWorker(
+		&clickhouseClientAdapter{chClient},
+		cohortService,
+	)
+	cohortService.SetRecomputeWorker(recomputeWorker)
+	recomputeWorker.Start(ctx)
+
 	// Event service no longer writes to ClickHouse directly - inserter-service handles that
 	eventService := event.NewService(&eventRepoAdapter{eventRepo}, &eventProducerAdapter{kafkaProducer})
 	membershipService := membership.NewService(
@@ -421,6 +430,19 @@ func (a *broadcasterAdapter) Subscribe(id string, sub *membership.StreamSubscrip
 
 func (a *broadcasterAdapter) Unsubscribe(id string) {
 	a.broadcaster.Unsubscribe(id)
+}
+
+// clickhouseClientAdapter adapts the clickhouse.Client for the recompute worker
+type clickhouseClientAdapter struct {
+	client *clickhouse.Client
+}
+
+func (a *clickhouseClientAdapter) Query(ctx context.Context, query string, args ...any) (cohort.RowScanner, error) {
+	return a.client.Query(ctx, query, args...)
+}
+
+func (a *clickhouseClientAdapter) PrepareBatch(ctx context.Context, query string) (cohort.Batch, error) {
+	return a.client.PrepareBatch(ctx, query)
 }
 
 // Ensure uuid is used
