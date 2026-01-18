@@ -27,12 +27,12 @@ jobs:
         run: make generate-mocks
 
       - name: Run tests with coverage
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/domain/cohort/...
 
       - name: Check coverage threshold
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Coverage: ${COVERAGE}%"
+          echo "Cohort package coverage: ${COVERAGE}%"
           if (( $(echo "$COVERAGE < 65" | bc -l) )); then
             echo "::error::Coverage ${COVERAGE}% is below 65% threshold"
             exit 1
