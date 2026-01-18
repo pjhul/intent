@@ -11,14 +11,17 @@ import org.slf4j.LoggerFactory;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Serializes membership changes to JSON format compatible with ClickHouse Kafka table engine.
+ * Serializes membership changes to JSON format for the Go inserter service.
  *
  * Output format:
  * {
  *   "cohort_id": "uuid-string",
+ *   "cohort_name": "name",
  *   "user_id": "user-id",
- *   "is_member": 0 or 1,
- *   "timestamp": "2024-01-01T00:00:00.000Z"
+ *   "prev_status": -1 or 1,
+ *   "new_status": -1 or 1,
+ *   "changed_at": "2024-01-01T00:00:00.000Z",
+ *   "trigger_event": "uuid-string" (optional)
  * }
  */
 public class MembershipChangeSerializer implements SerializationSchema<MembershipChange> {
@@ -40,13 +43,16 @@ public class MembershipChangeSerializer implements SerializationSchema<Membershi
                 open(null);
             }
 
-            // Create ClickHouse-compatible format
             ObjectNode node = objectMapper.createObjectNode();
             node.put("cohort_id", change.getCohortId().toString());
+            node.put("cohort_name", change.getCohortName());
             node.put("user_id", change.getUserId());
-            // Convert status (-1 = out, 1 = in) to is_member (0 or 1)
-            node.put("is_member", change.getNewStatus() == MembershipChange.STATUS_IN ? 1 : 0);
-            node.put("timestamp", ISO_FORMATTER.format(change.getChangedAt()));
+            node.put("prev_status", change.getPrevStatus());
+            node.put("new_status", change.getNewStatus());
+            node.put("changed_at", ISO_FORMATTER.format(change.getChangedAt()));
+            if (change.getTriggerEvent() != null) {
+                node.put("trigger_event", change.getTriggerEvent().toString());
+            }
 
             return objectMapper.writeValueAsBytes(node);
         } catch (Exception e) {
