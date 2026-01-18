@@ -182,3 +182,63 @@ func (h *CohortHandler) Deactivate(c *gin.Context) {
 
 	c.JSON(http.StatusOK, coh)
 }
+
+// Recompute triggers a recompute job for a cohort
+// POST /cohorts/:id/recompute
+func (h *CohortHandler) Recompute(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid cohort ID"})
+		return
+	}
+
+	var req cohort.RecomputeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Allow empty body - force defaults to false
+		req = cohort.RecomputeRequest{Force: false}
+	}
+
+	resp, err := h.service.TriggerRecompute(c.Request.Context(), id, req.Force)
+	if err != nil {
+		if err == cohort.ErrCohortNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "cohort not found"})
+			return
+		}
+		if err == cohort.ErrRecomputeInProgress {
+			c.JSON(http.StatusConflict, gin.H{"error": "recompute already in progress"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, resp)
+}
+
+// GetRecomputeStatus retrieves the status of a recompute job
+// GET /cohorts/:id/recompute/:jobId
+func (h *CohortHandler) GetRecomputeStatus(c *gin.Context) {
+	_, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid cohort ID"})
+		return
+	}
+
+	jobID, err := uuid.Parse(c.Param("jobId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid job ID"})
+		return
+	}
+
+	job, err := h.service.GetRecomputeJob(c.Request.Context(), jobID)
+	if err != nil {
+		if err == cohort.ErrRecomputeJobNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "recompute job not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, job)
+}

@@ -2,11 +2,11 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { getCohort, deleteCohort, activateCohort, deactivateCohort, getCohortStats } from '$lib/api/cohorts';
+	import { getCohort, deleteCohort, activateCohort, deactivateCohort, getCohortStats, recomputeCohort, getRecomputeStatus } from '$lib/api/cohorts';
 	import { cohorts } from '$lib/stores/cohorts';
 	import { membershipChanges, connectSSE, clearChanges } from '$lib/stores/realtime';
 	import { toasts } from '$lib/stores/toast';
-	import type { Cohort, CohortStats } from '$lib/api/types';
+	import type { Cohort, CohortStats, RecomputeJob } from '$lib/api/types';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import MemberList from '$lib/components/MemberList.svelte';
 	import { format, formatDistanceToNow } from 'date-fns';
@@ -21,6 +21,10 @@
 	let showDeleteConfirm = false;
 
 	let disconnectSSE: (() => void) | null = null;
+
+	// Recompute state
+	let recomputeJob: RecomputeJob | null = null;
+	let recomputePollingInterval: ReturnType<typeof setInterval> | null = null;
 
 	$: relevantChanges = $membershipChanges.filter((c) => c.cohort_id === cohortId);
 
@@ -81,6 +85,67 @@
 		}
 	}
 
+	async function handleRecompute() {
+		if (!cohort || actionLoading || recomputeJob) return;
+		actionLoading = true;
+		try {
+			const response = await recomputeCohort(cohort.id);
+			recomputeJob = {
+				id: response.job_id,
+				cohort_id: response.cohort_id,
+				status: response.status,
+				progress: { total_users: 0, processed_users: 0, members_found: 0, members_added: 0, members_removed: 0 },
+				started_at: new Date().toISOString()
+			};
+			startRecomputePolling(response.job_id);
+			toasts.success('Recompute started');
+		} catch (e) {
+			if (e instanceof Error && e.message.includes('already in progress')) {
+				toasts.error('Recompute already in progress');
+			} else {
+				toasts.error('Failed to start recompute');
+			}
+		} finally {
+			actionLoading = false;
+		}
+	}
+
+	function startRecomputePolling(jobId: string) {
+		if (recomputePollingInterval) {
+			clearInterval(recomputePollingInterval);
+		}
+		recomputePollingInterval = setInterval(async () => {
+			if (!cohort) return;
+			try {
+				const job = await getRecomputeStatus(cohort.id, jobId);
+				recomputeJob = job;
+				if (job.status === 'completed' || job.status === 'failed') {
+					stopRecomputePolling();
+					if (job.status === 'completed') {
+						toasts.success(`Recompute complete: ${job.progress.members_added} added, ${job.progress.members_removed} removed`);
+						// Refresh stats after completion
+						stats = await getCohortStats(cohort.id);
+					} else {
+						toasts.error(`Recompute failed: ${job.error || 'Unknown error'}`);
+					}
+					// Clear job after a delay so user can see final state
+					setTimeout(() => {
+						recomputeJob = null;
+					}, 5000);
+				}
+			} catch (e) {
+				console.error('Failed to poll recompute status:', e);
+			}
+		}, 2000);
+	}
+
+	function stopRecomputePolling() {
+		if (recomputePollingInterval) {
+			clearInterval(recomputePollingInterval);
+			recomputePollingInterval = null;
+		}
+	}
+
 	onMount(() => {
 		loadCohort();
 		disconnectSSE = connectSSE([cohortId]);
@@ -90,6 +155,7 @@
 		if (disconnectSSE) {
 			disconnectSSE();
 		}
+		stopRecomputePolling();
 	});
 </script>
 
@@ -142,6 +208,21 @@
 					{#if cohort.status === 'active'}
 						<button
 							class="btn btn-secondary"
+							on:click={handleRecompute}
+							disabled={actionLoading || recomputeJob !== null}
+						>
+							{#if recomputeJob && (recomputeJob.status === 'pending' || recomputeJob.status === 'running')}
+								<svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+								</svg>
+								Recomputing...
+							{:else}
+								Recompute
+							{/if}
+						</button>
+						<button
+							class="btn btn-secondary"
 							on:click={handleDeactivate}
 							disabled={actionLoading}
 						>
@@ -167,6 +248,59 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Recompute Progress -->
+		{#if recomputeJob && (recomputeJob.status === 'pending' || recomputeJob.status === 'running')}
+			<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+				<div class="flex items-center gap-3">
+					<svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+					</svg>
+					<div>
+						<div class="font-medium text-blue-900">Recomputing membership...</div>
+						<div class="text-sm text-blue-700">
+							{#if recomputeJob.progress.members_found > 0}
+								Found {recomputeJob.progress.members_found.toLocaleString()} matching users
+								{#if recomputeJob.progress.members_added > 0 || recomputeJob.progress.members_removed > 0}
+									| +{recomputeJob.progress.members_added.toLocaleString()} / -{recomputeJob.progress.members_removed.toLocaleString()}
+								{/if}
+							{:else}
+								Querying events...
+							{/if}
+						</div>
+					</div>
+				</div>
+			</div>
+		{:else if recomputeJob && recomputeJob.status === 'completed'}
+			<div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+				<div class="flex items-center gap-3">
+					<svg class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+					</svg>
+					<div>
+						<div class="font-medium text-green-900">Recompute complete</div>
+						<div class="text-sm text-green-700">
+							Found {recomputeJob.progress.members_found.toLocaleString()} members |
+							+{recomputeJob.progress.members_added.toLocaleString()} added |
+							-{recomputeJob.progress.members_removed.toLocaleString()} removed
+						</div>
+					</div>
+				</div>
+			</div>
+		{:else if recomputeJob && recomputeJob.status === 'failed'}
+			<div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+				<div class="flex items-center gap-3">
+					<svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+					<div>
+						<div class="font-medium text-red-900">Recompute failed</div>
+						<div class="text-sm text-red-700">{recomputeJob.error || 'Unknown error'}</div>
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 			<!-- Main Content -->

@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { Cohort, CreateCohortRequest, UpdateCohortRequest, CohortStats } from './types';
+import type { Cohort, CreateCohortRequest, UpdateCohortRequest, CohortStats, RecomputeResponse, RecomputeJob } from './types';
 
 const BASE_PATH = '/api/v1/cohorts';
 
@@ -52,4 +52,15 @@ export async function deactivateCohort(id: string): Promise<Cohort> {
 
 export async function getCohortStats(id: string): Promise<CohortStats> {
 	return api<CohortStats>(`${BASE_PATH}/${id}/stats`);
+}
+
+export async function recomputeCohort(id: string, force?: boolean): Promise<RecomputeResponse> {
+	return api<RecomputeResponse>(`${BASE_PATH}/${id}/recompute`, {
+		method: 'POST',
+		body: JSON.stringify({ force: force ?? false })
+	});
+}
+
+export async function getRecomputeStatus(cohortId: string, jobId: string): Promise<RecomputeJob> {
+	return api<RecomputeJob>(`${BASE_PATH}/${cohortId}/recompute/${jobId}`);
 }
