@@ -2,7 +2,15 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { getCohort, deleteCohort, activateCohort, deactivateCohort, getCohortStats, recomputeCohort, getRecomputeStatus } from '$lib/api/cohorts';
+	import {
+		getCohort,
+		deleteCohort,
+		activateCohort,
+		deactivateCohort,
+		getCohortStats,
+		recomputeCohort,
+		getRecomputeStatus
+	} from '$lib/api/cohorts';
 	import { cohorts } from '$lib/stores/cohorts';
 	import { membershipChanges, connectSSE, clearChanges } from '$lib/stores/realtime';
 	import { toasts } from '$lib/stores/toast';
@@ -11,6 +19,8 @@
 	import MemberList from '$lib/components/MemberList.svelte';
 	import { format, formatDistanceToNow } from 'date-fns';
 
+	$: orgSlug = $page.params.orgSlug;
+	$: projectSlug = $page.params.projectSlug;
 	$: cohortId = $page.params.id;
 
 	let cohort: Cohort | null = null;
@@ -32,8 +42,8 @@
 		loading = true;
 		error = null;
 		try {
-			cohort = await getCohort(cohortId);
-			stats = await getCohortStats(cohortId);
+			cohort = await getCohort(orgSlug, projectSlug, cohortId);
+			stats = await getCohortStats(orgSlug, projectSlug, cohortId);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load cohort';
 		} finally {
@@ -45,7 +55,7 @@
 		if (!cohort || actionLoading) return;
 		actionLoading = true;
 		try {
-			cohort = await activateCohort(cohort.id);
+			cohort = await activateCohort(orgSlug, projectSlug, cohort.id);
 			cohorts.updateCohort(cohort.id, cohort);
 			toasts.success('Cohort activated');
 		} catch (e) {
@@ -59,7 +69,7 @@
 		if (!cohort || actionLoading) return;
 		actionLoading = true;
 		try {
-			cohort = await deactivateCohort(cohort.id);
+			cohort = await deactivateCohort(orgSlug, projectSlug, cohort.id);
 			cohorts.updateCohort(cohort.id, cohort);
 			toasts.success('Cohort deactivated');
 		} catch (e) {
@@ -73,10 +83,10 @@
 		if (!cohort || actionLoading) return;
 		actionLoading = true;
 		try {
-			await deleteCohort(cohort.id);
+			await deleteCohort(orgSlug, projectSlug, cohort.id);
 			cohorts.remove(cohort.id);
 			toasts.success('Cohort deleted');
-			goto('/');
+			goto(`/${orgSlug}/${projectSlug}`);
 		} catch (e) {
 			toasts.error('Failed to delete cohort');
 		} finally {
@@ -89,12 +99,18 @@
 		if (!cohort || actionLoading || recomputeJob) return;
 		actionLoading = true;
 		try {
-			const response = await recomputeCohort(cohort.id);
+			const response = await recomputeCohort(orgSlug, projectSlug, cohort.id);
 			recomputeJob = {
 				id: response.job_id,
 				cohort_id: response.cohort_id,
 				status: response.status,
-				progress: { total_users: 0, processed_users: 0, members_found: 0, members_added: 0, members_removed: 0 },
+				progress: {
+					total_users: 0,
+					processed_users: 0,
+					members_found: 0,
+					members_added: 0,
+					members_removed: 0
+				},
 				started_at: new Date().toISOString()
 			};
 			startRecomputePolling(response.job_id);
@@ -117,14 +133,16 @@
 		recomputePollingInterval = setInterval(async () => {
 			if (!cohort) return;
 			try {
-				const job = await getRecomputeStatus(cohort.id, jobId);
+				const job = await getRecomputeStatus(orgSlug, projectSlug, cohort.id, jobId);
 				recomputeJob = job;
 				if (job.status === 'completed' || job.status === 'failed') {
 					stopRecomputePolling();
 					if (job.status === 'completed') {
-						toasts.success(`Recompute complete: ${job.progress.members_added} added, ${job.progress.members_removed} removed`);
+						toasts.success(
+							`Recompute complete: ${job.progress.members_added} added, ${job.progress.members_removed} removed`
+						);
 						// Refresh stats after completion
-						stats = await getCohortStats(cohort.id);
+						stats = await getCohortStats(orgSlug, projectSlug, cohort.id);
 					} else {
 						toasts.error(`Recompute failed: ${job.error || 'Unknown error'}`);
 					}
@@ -181,14 +199,14 @@
 				{error}
 			</div>
 			<div class="mt-4">
-				<a href="/" class="btn btn-secondary">Back to Dashboard</a>
+				<a href="/{orgSlug}/{projectSlug}" class="btn btn-secondary">Back to Dashboard</a>
 			</div>
 		</div>
 	{:else if cohort}
 		<!-- Header -->
 		<div class="mb-6">
 			<div class="flex items-center gap-2 text-sm text-gray-500 mb-2">
-				<a href="/" class="hover:text-gray-700">Dashboard</a>
+				<a href="/{orgSlug}/{projectSlug}" class="hover:text-gray-700">Dashboard</a>
 				<span>/</span>
 				<span>{cohort.name}</span>
 			</div>
@@ -213,31 +231,36 @@
 						>
 							{#if recomputeJob && (recomputeJob.status === 'pending' || recomputeJob.status === 'running')}
 								<svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+									<circle
+										class="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									/>
+									<path
+										class="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									/>
 								</svg>
 								Recomputing...
 							{:else}
 								Recompute
 							{/if}
 						</button>
-						<button
-							class="btn btn-secondary"
-							on:click={handleDeactivate}
-							disabled={actionLoading}
-						>
+						<button class="btn btn-secondary" on:click={handleDeactivate} disabled={actionLoading}>
 							Deactivate
 						</button>
 					{:else}
-						<button
-							class="btn btn-success"
-							on:click={handleActivate}
-							disabled={actionLoading}
-						>
+						<button class="btn btn-success" on:click={handleActivate} disabled={actionLoading}>
 							Activate
 						</button>
 					{/if}
-					<a href="/cohorts/{cohort.id}/edit" class="btn btn-secondary">Edit</a>
+					<a href="/{orgSlug}/{projectSlug}/cohorts/{cohort.id}/edit" class="btn btn-secondary"
+						>Edit</a
+					>
 					<button
 						class="btn btn-danger"
 						on:click={() => (showDeleteConfirm = true)}
@@ -254,8 +277,19 @@
 			<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
 				<div class="flex items-center gap-3">
 					<svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						/>
 					</svg>
 					<div>
 						<div class="font-medium text-blue-900">Recomputing membership...</div>
@@ -275,7 +309,12 @@
 		{:else if recomputeJob && recomputeJob.status === 'completed'}
 			<div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
 				<div class="flex items-center gap-3">
-					<svg class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg
+						class="h-5 w-5 text-green-600"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 					</svg>
 					<div>
@@ -292,7 +331,12 @@
 			<div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
 				<div class="flex items-center gap-3">
 					<svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
 					</svg>
 					<div>
 						<div class="font-medium text-red-900">Recompute failed</div>
@@ -333,7 +377,8 @@
 					<h2 class="font-semibold text-gray-900 mb-4">Rules</h2>
 					<div class="bg-gray-50 rounded-lg p-4">
 						<div class="text-sm text-gray-500 mb-2">
-							Match <span class="font-medium text-gray-700">{cohort.rules.operator}</span> of the following conditions:
+							Match <span class="font-medium text-gray-700">{cohort.rules.operator}</span> of the following
+							conditions:
 						</div>
 						{#if cohort.rules.conditions.length === 0}
 							<p class="text-gray-500 italic">No conditions defined</p>
@@ -371,7 +416,7 @@
 
 				<!-- Members -->
 				<div class="card p-4">
-					<MemberList cohortId={cohort.id} />
+					<MemberList cohortId={cohort.id} {orgSlug} {projectSlug} />
 				</div>
 			</div>
 
@@ -420,7 +465,7 @@
 												: 'bg-red-500'}"
 										></span>
 										<a
-											href="/users/{change.user_id}"
+											href="/{orgSlug}/{projectSlug}/users/{change.user_id}"
 											class="font-medium truncate hover:text-blue-600"
 										>
 											{change.user_id}

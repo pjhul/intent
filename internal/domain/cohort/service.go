@@ -44,14 +44,16 @@ func (s *Service) SetRecomputeWorker(worker *RecomputeWorker) {
 	s.recomputeWorker = worker
 }
 
-// Create creates a new cohort
-func (s *Service) Create(ctx context.Context, req CreateCohortRequest) (*Cohort, error) {
+// Create creates a new cohort within a project
+func (s *Service) Create(ctx context.Context, projectID uuid.UUID, req CreateCohortRequest) (*Cohort, error) {
 	rulesJSON, err := json.Marshal(req.Rules)
 	if err != nil {
 		return nil, ErrInvalidRules
 	}
 
+	pgProjectID := pgtype.UUID{Bytes: projectID, Valid: true}
 	dbCohort, err := s.queries.CreateCohort(ctx, db.CreateCohortParams{
+		ProjectID:   pgProjectID,
 		Name:        req.Name,
 		Description: pgtype.Text{String: req.Description, Valid: req.Description != ""},
 		Rules:       rulesJSON,
@@ -61,7 +63,7 @@ func (s *Service) Create(ctx context.Context, req CreateCohortRequest) (*Cohort,
 		return nil, err
 	}
 
-	cohort := dbCohortToDomain(dbCohort)
+	cohort := dbCohortRowToDomain(dbCohort)
 
 	// Publish to Kafka for Flink
 	if s.kafkaProducer != nil {
@@ -79,14 +81,16 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Cohort, error) {
 		return nil, ErrCohortNotFound
 	}
 
-	return dbCohortToDomain(dbCohort), nil
+	return dbGetCohortRowToDomain(dbCohort), nil
 }
 
-// List retrieves cohorts with pagination
-func (s *Service) List(ctx context.Context, limit, offset int) ([]*Cohort, error) {
+// List retrieves cohorts for a project with pagination
+func (s *Service) List(ctx context.Context, projectID uuid.UUID, limit, offset int) ([]*Cohort, error) {
+	pgProjectID := pgtype.UUID{Bytes: projectID, Valid: true}
 	dbCohorts, err := s.queries.ListCohorts(ctx, db.ListCohortsParams{
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		ProjectID: pgProjectID,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
 	})
 	if err != nil {
 		return nil, err
@@ -94,22 +98,38 @@ func (s *Service) List(ctx context.Context, limit, offset int) ([]*Cohort, error
 
 	cohorts := make([]*Cohort, len(dbCohorts))
 	for i, c := range dbCohorts {
-		cohorts[i] = dbCohortToDomain(c)
+		cohorts[i] = dbListCohortsRowToDomain(c)
 	}
 
 	return cohorts, nil
 }
 
-// ListActive retrieves all active cohorts
-func (s *Service) ListActive(ctx context.Context) ([]*Cohort, error) {
-	dbCohorts, err := s.queries.ListActiveCohorts(ctx)
+// ListActive retrieves all active cohorts for a project
+func (s *Service) ListActive(ctx context.Context, projectID uuid.UUID) ([]*Cohort, error) {
+	pgProjectID := pgtype.UUID{Bytes: projectID, Valid: true}
+	dbCohorts, err := s.queries.ListActiveCohorts(ctx, pgProjectID)
 	if err != nil {
 		return nil, err
 	}
 
 	cohorts := make([]*Cohort, len(dbCohorts))
 	for i, c := range dbCohorts {
-		cohorts[i] = dbCohortToDomain(c)
+		cohorts[i] = dbListActiveCohortsRowToDomain(c)
+	}
+
+	return cohorts, nil
+}
+
+// ListAllActive retrieves all active cohorts across all projects
+func (s *Service) ListAllActive(ctx context.Context) ([]*Cohort, error) {
+	dbCohorts, err := s.queries.ListAllActiveCohorts(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	cohorts := make([]*Cohort, len(dbCohorts))
+	for i, c := range dbCohorts {
+		cohorts[i] = dbListAllActiveCohortsRowToDomain(c)
 	}
 
 	return cohorts, nil
@@ -153,18 +173,18 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateCohortRequ
 		return nil, err
 	}
 
-	cohort := dbCohortToDomain(dbCohort)
+	cohort := dbUpdateCohortRowToDomain(dbCohort)
 
 	// Update status if provided
 	if req.Status != "" && req.Status != cohort.Status {
-		dbCohort, err = s.queries.UpdateCohortStatus(ctx, db.UpdateCohortStatusParams{
+		dbCohort, err := s.queries.UpdateCohortStatus(ctx, db.UpdateCohortStatusParams{
 			ID:     pgID,
 			Status: string(req.Status),
 		})
 		if err != nil {
 			return nil, err
 		}
-		cohort = dbCohortToDomain(dbCohort)
+		cohort = dbUpdateCohortStatusRowToDomain(dbCohort)
 	}
 
 	// Publish update to Kafka
@@ -193,7 +213,7 @@ func (s *Service) Activate(ctx context.Context, id uuid.UUID) (*Cohort, error) {
 		return nil, ErrCohortNotFound
 	}
 
-	cohort := dbCohortToDomain(dbCohort)
+	cohort := dbUpdateCohortStatusRowToDomain(dbCohort)
 
 	if s.kafkaProducer != nil {
 		s.kafkaProducer.ProduceCohortDefinition(ctx, cohort)
@@ -218,7 +238,7 @@ func (s *Service) Deactivate(ctx context.Context, id uuid.UUID) (*Cohort, error)
 		return nil, ErrCohortNotFound
 	}
 
-	cohort := dbCohortToDomain(dbCohort)
+	cohort := dbUpdateCohortStatusRowToDomain(dbCohort)
 
 	if s.kafkaProducer != nil {
 		s.kafkaProducer.ProduceCohortDefinition(ctx, cohort)
@@ -241,12 +261,116 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func dbCohortToDomain(c db.Cohort) *Cohort {
+// Conversion functions for different row types
+func dbCohortRowToDomain(c db.CreateCohortRow) *Cohort {
 	var rules Rules
 	json.Unmarshal(c.Rules, &rules)
 
 	return &Cohort{
 		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
+		Name:        c.Name,
+		Description: c.Description.String,
+		Rules:       rules,
+		Status:      CohortStatus(c.Status),
+		Version:     c.Version,
+		CreatedAt:   c.CreatedAt.Time,
+		UpdatedAt:   c.UpdatedAt.Time,
+	}
+}
+
+func dbGetCohortRowToDomain(c db.GetCohortRow) *Cohort {
+	var rules Rules
+	json.Unmarshal(c.Rules, &rules)
+
+	return &Cohort{
+		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
+		Name:        c.Name,
+		Description: c.Description.String,
+		Rules:       rules,
+		Status:      CohortStatus(c.Status),
+		Version:     c.Version,
+		CreatedAt:   c.CreatedAt.Time,
+		UpdatedAt:   c.UpdatedAt.Time,
+	}
+}
+
+func dbListCohortsRowToDomain(c db.ListCohortsRow) *Cohort {
+	var rules Rules
+	json.Unmarshal(c.Rules, &rules)
+
+	return &Cohort{
+		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
+		Name:        c.Name,
+		Description: c.Description.String,
+		Rules:       rules,
+		Status:      CohortStatus(c.Status),
+		Version:     c.Version,
+		CreatedAt:   c.CreatedAt.Time,
+		UpdatedAt:   c.UpdatedAt.Time,
+	}
+}
+
+func dbListActiveCohortsRowToDomain(c db.ListActiveCohortsRow) *Cohort {
+	var rules Rules
+	json.Unmarshal(c.Rules, &rules)
+
+	return &Cohort{
+		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
+		Name:        c.Name,
+		Description: c.Description.String,
+		Rules:       rules,
+		Status:      CohortStatus(c.Status),
+		Version:     c.Version,
+		CreatedAt:   c.CreatedAt.Time,
+		UpdatedAt:   c.UpdatedAt.Time,
+	}
+}
+
+func dbListAllActiveCohortsRowToDomain(c db.ListAllActiveCohortsRow) *Cohort {
+	var rules Rules
+	json.Unmarshal(c.Rules, &rules)
+
+	return &Cohort{
+		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
+		Name:        c.Name,
+		Description: c.Description.String,
+		Rules:       rules,
+		Status:      CohortStatus(c.Status),
+		Version:     c.Version,
+		CreatedAt:   c.CreatedAt.Time,
+		UpdatedAt:   c.UpdatedAt.Time,
+	}
+}
+
+func dbUpdateCohortRowToDomain(c db.UpdateCohortRow) *Cohort {
+	var rules Rules
+	json.Unmarshal(c.Rules, &rules)
+
+	return &Cohort{
+		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
+		Name:        c.Name,
+		Description: c.Description.String,
+		Rules:       rules,
+		Status:      CohortStatus(c.Status),
+		Version:     c.Version,
+		CreatedAt:   c.CreatedAt.Time,
+		UpdatedAt:   c.UpdatedAt.Time,
+	}
+}
+
+func dbUpdateCohortStatusRowToDomain(c db.UpdateCohortStatusRow) *Cohort {
+	var rules Rules
+	json.Unmarshal(c.Rules, &rules)
+
+	return &Cohort{
+		ID:          uuid.UUID(c.ID.Bytes),
+		ProjectID:   uuid.UUID(c.ProjectID.Bytes),
 		Name:        c.Name,
 		Description: c.Description.String,
 		Rules:       rules,

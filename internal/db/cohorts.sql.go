@@ -12,50 +12,70 @@ import (
 )
 
 const countCohorts = `-- name: CountCohorts :one
-SELECT COUNT(*) FROM cohorts
+SELECT COUNT(*) FROM cohorts WHERE project_id = $1
 `
 
-func (q *Queries) CountCohorts(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countCohorts)
+func (q *Queries) CountCohorts(ctx context.Context, projectID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCohorts, projectID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const countCohortsByStatus = `-- name: CountCohortsByStatus :one
-SELECT COUNT(*) FROM cohorts WHERE status = $1
+SELECT COUNT(*) FROM cohorts WHERE project_id = $1 AND status = $2
 `
 
-func (q *Queries) CountCohortsByStatus(ctx context.Context, status string) (int64, error) {
-	row := q.db.QueryRow(ctx, countCohortsByStatus, status)
+type CountCohortsByStatusParams struct {
+	ProjectID pgtype.UUID `json:"project_id"`
+	Status    string      `json:"status"`
+}
+
+func (q *Queries) CountCohortsByStatus(ctx context.Context, arg CountCohortsByStatusParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countCohortsByStatus, arg.ProjectID, arg.Status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createCohort = `-- name: CreateCohort :one
-INSERT INTO cohorts (name, description, rules, status, version)
-VALUES ($1, $2, $3, $4, 1)
-RETURNING id, name, description, rules, status, version, created_at, updated_at
+INSERT INTO cohorts (project_id, name, description, rules, status, version)
+VALUES ($1, $2, $3, $4, $5, 1)
+RETURNING id, project_id, name, description, rules, status, version, created_at, updated_at
 `
 
 type CreateCohortParams struct {
+	ProjectID   pgtype.UUID `json:"project_id"`
 	Name        string      `json:"name"`
 	Description pgtype.Text `json:"description"`
 	Rules       []byte      `json:"rules"`
 	Status      string      `json:"status"`
 }
 
-func (q *Queries) CreateCohort(ctx context.Context, arg CreateCohortParams) (Cohort, error) {
+type CreateCohortRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) CreateCohort(ctx context.Context, arg CreateCohortParams) (CreateCohortRow, error) {
 	row := q.db.QueryRow(ctx, createCohort,
+		arg.ProjectID,
 		arg.Name,
 		arg.Description,
 		arg.Rules,
 		arg.Status,
 	)
-	var i Cohort
+	var i CreateCohortRow
 	err := row.Scan(
 		&i.ID,
+		&i.ProjectID,
 		&i.Name,
 		&i.Description,
 		&i.Rules,
@@ -78,16 +98,29 @@ func (q *Queries) DeleteCohort(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getCohort = `-- name: GetCohort :one
-SELECT id, name, description, rules, status, version, created_at, updated_at
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
 FROM cohorts
 WHERE id = $1
 `
 
-func (q *Queries) GetCohort(ctx context.Context, id pgtype.UUID) (Cohort, error) {
+type GetCohortRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetCohort(ctx context.Context, id pgtype.UUID) (GetCohortRow, error) {
 	row := q.db.QueryRow(ctx, getCohort, id)
-	var i Cohort
+	var i GetCohortRow
 	err := row.Scan(
 		&i.ID,
+		&i.ProjectID,
 		&i.Name,
 		&i.Description,
 		&i.Rules,
@@ -100,16 +133,34 @@ func (q *Queries) GetCohort(ctx context.Context, id pgtype.UUID) (Cohort, error)
 }
 
 const getCohortByName = `-- name: GetCohortByName :one
-SELECT id, name, description, rules, status, version, created_at, updated_at
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
 FROM cohorts
-WHERE name = $1
+WHERE project_id = $1 AND name = $2
 `
 
-func (q *Queries) GetCohortByName(ctx context.Context, name string) (Cohort, error) {
-	row := q.db.QueryRow(ctx, getCohortByName, name)
-	var i Cohort
+type GetCohortByNameParams struct {
+	ProjectID pgtype.UUID `json:"project_id"`
+	Name      string      `json:"name"`
+}
+
+type GetCohortByNameRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetCohortByName(ctx context.Context, arg GetCohortByNameParams) (GetCohortByNameRow, error) {
+	row := q.db.QueryRow(ctx, getCohortByName, arg.ProjectID, arg.Name)
+	var i GetCohortByNameRow
 	err := row.Scan(
 		&i.ID,
+		&i.ProjectID,
 		&i.Name,
 		&i.Description,
 		&i.Rules,
@@ -122,23 +173,36 @@ func (q *Queries) GetCohortByName(ctx context.Context, name string) (Cohort, err
 }
 
 const getCohortsUpdatedAfter = `-- name: GetCohortsUpdatedAfter :many
-SELECT id, name, description, rules, status, version, created_at, updated_at
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
 FROM cohorts
 WHERE updated_at > $1
 ORDER BY updated_at ASC
 `
 
-func (q *Queries) GetCohortsUpdatedAfter(ctx context.Context, updatedAt pgtype.Timestamptz) ([]Cohort, error) {
+type GetCohortsUpdatedAfterRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetCohortsUpdatedAfter(ctx context.Context, updatedAt pgtype.Timestamptz) ([]GetCohortsUpdatedAfterRow, error) {
 	rows, err := q.db.Query(ctx, getCohortsUpdatedAfter, updatedAt)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Cohort{}
+	items := []GetCohortsUpdatedAfterRow{}
 	for rows.Next() {
-		var i Cohort
+		var i GetCohortsUpdatedAfterRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.ProjectID,
 			&i.Name,
 			&i.Description,
 			&i.Rules,
@@ -158,23 +222,85 @@ func (q *Queries) GetCohortsUpdatedAfter(ctx context.Context, updatedAt pgtype.T
 }
 
 const listActiveCohorts = `-- name: ListActiveCohorts :many
-SELECT id, name, description, rules, status, version, created_at, updated_at
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
+FROM cohorts
+WHERE project_id = $1 AND status = 'active'
+ORDER BY created_at DESC
+`
+
+type ListActiveCohortsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListActiveCohorts(ctx context.Context, projectID pgtype.UUID) ([]ListActiveCohortsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveCohorts, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveCohortsRow{}
+	for rows.Next() {
+		var i ListActiveCohortsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Name,
+			&i.Description,
+			&i.Rules,
+			&i.Status,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllActiveCohorts = `-- name: ListAllActiveCohorts :many
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
 FROM cohorts
 WHERE status = 'active'
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListActiveCohorts(ctx context.Context) ([]Cohort, error) {
-	rows, err := q.db.Query(ctx, listActiveCohorts)
+type ListAllActiveCohortsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListAllActiveCohorts(ctx context.Context) ([]ListAllActiveCohortsRow, error) {
+	rows, err := q.db.Query(ctx, listAllActiveCohorts)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Cohort{}
+	items := []ListAllActiveCohortsRow{}
 	for rows.Next() {
-		var i Cohort
+		var i ListAllActiveCohortsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.ProjectID,
 			&i.Name,
 			&i.Description,
 			&i.Rules,
@@ -194,28 +320,43 @@ func (q *Queries) ListActiveCohorts(ctx context.Context) ([]Cohort, error) {
 }
 
 const listCohorts = `-- name: ListCohorts :many
-SELECT id, name, description, rules, status, version, created_at, updated_at
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
 FROM cohorts
+WHERE project_id = $1
 ORDER BY created_at DESC
-LIMIT $1 OFFSET $2
+LIMIT $2 OFFSET $3
 `
 
 type ListCohortsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	ProjectID pgtype.UUID `json:"project_id"`
+	Limit     int32       `json:"limit"`
+	Offset    int32       `json:"offset"`
 }
 
-func (q *Queries) ListCohorts(ctx context.Context, arg ListCohortsParams) ([]Cohort, error) {
-	rows, err := q.db.Query(ctx, listCohorts, arg.Limit, arg.Offset)
+type ListCohortsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListCohorts(ctx context.Context, arg ListCohortsParams) ([]ListCohortsRow, error) {
+	rows, err := q.db.Query(ctx, listCohorts, arg.ProjectID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Cohort{}
+	items := []ListCohortsRow{}
 	for rows.Next() {
-		var i Cohort
+		var i ListCohortsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.ProjectID,
 			&i.Name,
 			&i.Description,
 			&i.Rules,
@@ -235,30 +376,49 @@ func (q *Queries) ListCohorts(ctx context.Context, arg ListCohortsParams) ([]Coh
 }
 
 const listCohortsByStatus = `-- name: ListCohortsByStatus :many
-SELECT id, name, description, rules, status, version, created_at, updated_at
+SELECT id, project_id, name, description, rules, status, version, created_at, updated_at
 FROM cohorts
-WHERE status = $1
+WHERE project_id = $1 AND status = $2
 ORDER BY created_at DESC
-LIMIT $2 OFFSET $3
+LIMIT $3 OFFSET $4
 `
 
 type ListCohortsByStatusParams struct {
-	Status string `json:"status"`
-	Limit  int32  `json:"limit"`
-	Offset int32  `json:"offset"`
+	ProjectID pgtype.UUID `json:"project_id"`
+	Status    string      `json:"status"`
+	Limit     int32       `json:"limit"`
+	Offset    int32       `json:"offset"`
 }
 
-func (q *Queries) ListCohortsByStatus(ctx context.Context, arg ListCohortsByStatusParams) ([]Cohort, error) {
-	rows, err := q.db.Query(ctx, listCohortsByStatus, arg.Status, arg.Limit, arg.Offset)
+type ListCohortsByStatusRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListCohortsByStatus(ctx context.Context, arg ListCohortsByStatusParams) ([]ListCohortsByStatusRow, error) {
+	rows, err := q.db.Query(ctx, listCohortsByStatus,
+		arg.ProjectID,
+		arg.Status,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Cohort{}
+	items := []ListCohortsByStatusRow{}
 	for rows.Next() {
-		var i Cohort
+		var i ListCohortsByStatusRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.ProjectID,
 			&i.Name,
 			&i.Description,
 			&i.Rules,
@@ -281,7 +441,7 @@ const updateCohort = `-- name: UpdateCohort :one
 UPDATE cohorts
 SET name = $2, description = $3, rules = $4, version = version + 1
 WHERE id = $1
-RETURNING id, name, description, rules, status, version, created_at, updated_at
+RETURNING id, project_id, name, description, rules, status, version, created_at, updated_at
 `
 
 type UpdateCohortParams struct {
@@ -291,16 +451,29 @@ type UpdateCohortParams struct {
 	Rules       []byte      `json:"rules"`
 }
 
-func (q *Queries) UpdateCohort(ctx context.Context, arg UpdateCohortParams) (Cohort, error) {
+type UpdateCohortRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UpdateCohort(ctx context.Context, arg UpdateCohortParams) (UpdateCohortRow, error) {
 	row := q.db.QueryRow(ctx, updateCohort,
 		arg.ID,
 		arg.Name,
 		arg.Description,
 		arg.Rules,
 	)
-	var i Cohort
+	var i UpdateCohortRow
 	err := row.Scan(
 		&i.ID,
+		&i.ProjectID,
 		&i.Name,
 		&i.Description,
 		&i.Rules,
@@ -316,7 +489,7 @@ const updateCohortStatus = `-- name: UpdateCohortStatus :one
 UPDATE cohorts
 SET status = $2
 WHERE id = $1
-RETURNING id, name, description, rules, status, version, created_at, updated_at
+RETURNING id, project_id, name, description, rules, status, version, created_at, updated_at
 `
 
 type UpdateCohortStatusParams struct {
@@ -324,11 +497,24 @@ type UpdateCohortStatusParams struct {
 	Status string      `json:"status"`
 }
 
-func (q *Queries) UpdateCohortStatus(ctx context.Context, arg UpdateCohortStatusParams) (Cohort, error) {
+type UpdateCohortStatusRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	ProjectID   pgtype.UUID        `json:"project_id"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	Rules       []byte             `json:"rules"`
+	Status      string             `json:"status"`
+	Version     int64              `json:"version"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UpdateCohortStatus(ctx context.Context, arg UpdateCohortStatusParams) (UpdateCohortStatusRow, error) {
 	row := q.db.QueryRow(ctx, updateCohortStatus, arg.ID, arg.Status)
-	var i Cohort
+	var i UpdateCohortStatusRow
 	err := row.Scan(
 		&i.ID,
+		&i.ProjectID,
 		&i.Name,
 		&i.Description,
 		&i.Rules,

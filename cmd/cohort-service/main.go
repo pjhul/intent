@@ -15,11 +15,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pjhul/intent/internal/api"
 	"github.com/pjhul/intent/internal/api/handlers"
+	"github.com/pjhul/intent/internal/api/middleware"
 	"github.com/pjhul/intent/internal/config"
 	"github.com/pjhul/intent/internal/db"
 	"github.com/pjhul/intent/internal/domain/cohort"
 	"github.com/pjhul/intent/internal/domain/event"
 	"github.com/pjhul/intent/internal/domain/membership"
+	"github.com/pjhul/intent/internal/domain/organization"
+	"github.com/pjhul/intent/internal/domain/project"
 	"github.com/pjhul/intent/internal/infrastructure/cache"
 	"github.com/pjhul/intent/internal/infrastructure/clickhouse"
 	"github.com/pjhul/intent/internal/infrastructure/flink"
@@ -85,6 +88,8 @@ func main() {
 	membershipCache := cache.NewMembershipCache(redisClient)
 
 	// Initialize services
+	organizationService := organization.NewService(queries)
+	projectService := project.NewService(queries)
 	cohortService := cohort.NewService(queries, &kafkaProducerAdapter{kafkaProducer})
 
 	// Initialize recompute worker
@@ -123,6 +128,11 @@ func main() {
 	wsHandler := handlers.NewWebSocketHandler(&broadcasterAdapter{broadcaster})
 	sseHandler := handlers.NewSSEHandler(&broadcasterAdapter{broadcaster})
 	flinkHandler := handlers.NewFlinkHandler(flinkJobManager)
+	organizationHandler := handlers.NewOrganizationHandler(organizationService)
+	projectHandler := handlers.NewProjectHandler(projectService, organizationService)
+
+	// Initialize context middleware
+	contextMiddleware := middleware.NewContextMiddleware(organizationService, projectService)
 
 	// Setup router
 	router := api.NewRouter(
@@ -132,6 +142,9 @@ func main() {
 		wsHandler,
 		sseHandler,
 		flinkHandler,
+		organizationHandler,
+		projectHandler,
+		contextMiddleware,
 	)
 
 	// Setup Gin engine

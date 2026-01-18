@@ -8,6 +8,8 @@
 	import CohortForm from '$lib/components/CohortForm.svelte';
 	import type { Cohort, UpdateCohortRequest } from '$lib/api/types';
 
+	$: orgSlug = $page.params.orgSlug;
+	$: projectSlug = $page.params.projectSlug;
 	$: cohortId = $page.params.id;
 
 	let cohort: Cohort | null = null;
@@ -19,7 +21,7 @@
 		loading = true;
 		error = null;
 		try {
-			cohort = await getCohort(cohortId);
+			cohort = await getCohort(orgSlug, projectSlug, cohortId);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load cohort';
 		} finally {
@@ -27,16 +29,14 @@
 		}
 	}
 
-	async function handleSubmit(
-		event: CustomEvent<UpdateCohortRequest>
-	) {
+	async function handleSubmit(event: CustomEvent<UpdateCohortRequest>) {
 		if (!cohort) return;
 		saving = true;
 		try {
-			const updated = await updateCohort(cohort.id, event.detail);
+			const updated = await updateCohort(orgSlug, projectSlug, cohort.id, event.detail);
 			cohorts.updateCohort(cohort.id, updated);
 			toasts.success('Cohort updated successfully');
-			goto(`/cohorts/${cohort.id}`);
+			goto(`/${orgSlug}/${projectSlug}/cohorts/${cohort.id}`);
 		} catch (e) {
 			toasts.error(e instanceof Error ? e.message : 'Failed to update cohort');
 		} finally {
@@ -45,7 +45,7 @@
 	}
 
 	function handleCancel() {
-		goto(`/cohorts/${cohortId}`);
+		goto(`/${orgSlug}/${projectSlug}/cohorts/${cohortId}`);
 	}
 
 	onMount(loadCohort);
@@ -73,15 +73,17 @@
 				{error}
 			</div>
 			<div class="mt-4">
-				<a href="/" class="btn btn-secondary">Back to Dashboard</a>
+				<a href="/{orgSlug}/{projectSlug}" class="btn btn-secondary">Back to Dashboard</a>
 			</div>
 		</div>
 	{:else if cohort}
 		<!-- Breadcrumb -->
 		<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
-			<a href="/" class="hover:text-gray-700">Dashboard</a>
+			<a href="/{orgSlug}/{projectSlug}" class="hover:text-gray-700">Dashboard</a>
 			<span>/</span>
-			<a href="/cohorts/{cohort.id}" class="hover:text-gray-700">{cohort.name}</a>
+			<a href="/{orgSlug}/{projectSlug}/cohorts/{cohort.id}" class="hover:text-gray-700"
+				>{cohort.name}</a
+			>
 			<span>/</span>
 			<span>Edit</span>
 		</div>

@@ -23,6 +23,7 @@ func TestService_Create(t *testing.T) {
 	mockProducer := mocks.NewMockCohortProducer(ctrl)
 
 	svc := cohort.NewService(mockQuerier, mockProducer)
+	projectID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
 		req := cohort.CreateCohortRequest{
@@ -42,8 +43,9 @@ func TestService_Create(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			CreateCohort(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{
+			Return(db.CreateCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        req.Name,
 				Description: pgtype.Text{String: req.Description, Valid: true},
 				Rules:       rulesJSON,
@@ -57,7 +59,7 @@ func TestService_Create(t *testing.T) {
 			ProduceCohortDefinition(gomock.Any(), gomock.Any()).
 			Return(nil)
 
-		c, err := svc.Create(context.Background(), req)
+		c, err := svc.Create(context.Background(), projectID, req)
 		if err != nil {
 			t.Errorf("Create() unexpected error: %v", err)
 		}
@@ -80,9 +82,9 @@ func TestService_Create(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			CreateCohort(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{}, errors.New("database error"))
+			Return(db.CreateCohortRow{}, errors.New("database error"))
 
-		_, err := svc.Create(context.Background(), req)
+		_, err := svc.Create(context.Background(), projectID, req)
 		if err == nil {
 			t.Error("Create() expected error for database failure")
 		}
@@ -98,14 +100,16 @@ func TestService_GetByID(t *testing.T) {
 
 	t.Run("found", func(t *testing.T) {
 		cohortID := uuid.New()
+		projectID := uuid.New()
 		now := time.Now().UTC()
 		rules := cohort.Rules{Operator: cohort.OperatorAND, Conditions: []cohort.Condition{}}
 		rulesJSON, _ := json.Marshal(rules)
 
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Test Cohort",
 				Description: pgtype.Text{String: "Description", Valid: true},
 				Rules:       rulesJSON,
@@ -129,7 +133,7 @@ func TestService_GetByID(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{}, errors.New("not found"))
+			Return(db.GetCohortRow{}, errors.New("not found"))
 
 		_, err := svc.GetByID(context.Background(), cohortID)
 		if !errors.Is(err, cohort.ErrCohortNotFound) {
@@ -144,6 +148,7 @@ func TestService_List(t *testing.T) {
 
 	mockQuerier := mocks.NewMockQuerier(ctrl)
 	svc := cohort.NewService(mockQuerier, nil)
+	projectID := uuid.New()
 
 	t.Run("pagination", func(t *testing.T) {
 		now := time.Now().UTC()
@@ -154,10 +159,11 @@ func TestService_List(t *testing.T) {
 		cohort2ID := uuid.New()
 
 		mockQuerier.EXPECT().
-			ListCohorts(gomock.Any(), db.ListCohortsParams{Limit: 10, Offset: 0}).
-			Return([]db.Cohort{
+			ListCohorts(gomock.Any(), gomock.Any()).
+			Return([]db.ListCohortsRow{
 				{
 					ID:        pgtype.UUID{Bytes: cohort1ID, Valid: true},
+					ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 					Name:      "Cohort 1",
 					Rules:     rulesJSON,
 					Status:    string(cohort.CohortStatusActive),
@@ -167,6 +173,7 @@ func TestService_List(t *testing.T) {
 				},
 				{
 					ID:        pgtype.UUID{Bytes: cohort2ID, Valid: true},
+					ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 					Name:      "Cohort 2",
 					Rules:     rulesJSON,
 					Status:    string(cohort.CohortStatusDraft),
@@ -176,7 +183,7 @@ func TestService_List(t *testing.T) {
 				},
 			}, nil)
 
-		cohorts, err := svc.List(context.Background(), 10, 0)
+		cohorts, err := svc.List(context.Background(), projectID, 10, 0)
 		if err != nil {
 			t.Errorf("List() unexpected error: %v", err)
 		}
@@ -187,10 +194,10 @@ func TestService_List(t *testing.T) {
 
 	t.Run("empty result", func(t *testing.T) {
 		mockQuerier.EXPECT().
-			ListCohorts(gomock.Any(), db.ListCohortsParams{Limit: 10, Offset: 100}).
-			Return([]db.Cohort{}, nil)
+			ListCohorts(gomock.Any(), gomock.Any()).
+			Return([]db.ListCohortsRow{}, nil)
 
-		cohorts, err := svc.List(context.Background(), 10, 100)
+		cohorts, err := svc.List(context.Background(), projectID, 10, 100)
 		if err != nil {
 			t.Errorf("List() unexpected error: %v", err)
 		}
@@ -209,6 +216,7 @@ func TestService_Update(t *testing.T) {
 	svc := cohort.NewService(mockQuerier, mockProducer)
 
 	cohortID := uuid.New()
+	projectID := uuid.New()
 	now := time.Now().UTC()
 	rules := cohort.Rules{Operator: cohort.OperatorAND, Conditions: []cohort.Condition{{Type: cohort.ConditionTypeEvent, EventName: "purchase"}}}
 	rulesJSON, _ := json.Marshal(rules)
@@ -216,8 +224,9 @@ func TestService_Update(t *testing.T) {
 	t.Run("partial update - name only", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Original Name",
 				Description: pgtype.Text{String: "Original Description", Valid: true},
 				Rules:       rulesJSON,
@@ -229,8 +238,9 @@ func TestService_Update(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			UpdateCohort(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{
+			Return(db.UpdateCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Updated Name",
 				Description: pgtype.Text{String: "Original Description", Valid: true},
 				Rules:       rulesJSON,
@@ -257,8 +267,9 @@ func TestService_Update(t *testing.T) {
 	t.Run("update with status change", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Test Cohort",
 				Description: pgtype.Text{String: "Description", Valid: true},
 				Rules:       rulesJSON,
@@ -270,8 +281,9 @@ func TestService_Update(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			UpdateCohort(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{
+			Return(db.UpdateCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Test Cohort",
 				Description: pgtype.Text{String: "Description", Valid: true},
 				Rules:       rulesJSON,
@@ -286,8 +298,9 @@ func TestService_Update(t *testing.T) {
 				ID:     pgtype.UUID{Bytes: cohortID, Valid: true},
 				Status: string(cohort.CohortStatusActive),
 			}).
-			Return(db.Cohort{
+			Return(db.UpdateCohortStatusRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Test Cohort",
 				Description: pgtype.Text{String: "Description", Valid: true},
 				Rules:       rulesJSON,
@@ -320,8 +333,9 @@ func TestService_Update(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Test Cohort",
 				Description: pgtype.Text{String: "Description", Valid: true},
 				Rules:       rulesJSON,
@@ -333,8 +347,9 @@ func TestService_Update(t *testing.T) {
 
 		mockQuerier.EXPECT().
 			UpdateCohort(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{
+			Return(db.UpdateCohortRow{
 				ID:          pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID:   pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:        "Test Cohort",
 				Description: pgtype.Text{String: "Description", Valid: true},
 				Rules:       newRulesJSON,
@@ -361,7 +376,7 @@ func TestService_Update(t *testing.T) {
 	t.Run("cohort not found", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{}, errors.New("not found"))
+			Return(db.GetCohortRow{}, errors.New("not found"))
 
 		req := cohort.UpdateCohortRequest{Name: "Updated"}
 		_, err := svc.Update(context.Background(), cohortID, req)
@@ -380,6 +395,7 @@ func TestService_Activate(t *testing.T) {
 	svc := cohort.NewService(mockQuerier, mockProducer)
 
 	cohortID := uuid.New()
+	projectID := uuid.New()
 	now := time.Now().UTC()
 	rules := cohort.Rules{Operator: cohort.OperatorAND, Conditions: []cohort.Condition{{Type: cohort.ConditionTypeEvent, EventName: "purchase"}}}
 	rulesJSON, _ := json.Marshal(rules)
@@ -387,8 +403,9 @@ func TestService_Activate(t *testing.T) {
 	t.Run("first activation triggers recompute", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusDraft),
@@ -402,8 +419,9 @@ func TestService_Activate(t *testing.T) {
 				ID:     pgtype.UUID{Bytes: cohortID, Valid: true},
 				Status: string(cohort.CohortStatusActive),
 			}).
-			Return(db.Cohort{
+			Return(db.UpdateCohortStatusRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusActive),
@@ -428,8 +446,9 @@ func TestService_Activate(t *testing.T) {
 	t.Run("reactivation does not trigger recompute", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusInactive),
@@ -443,8 +462,9 @@ func TestService_Activate(t *testing.T) {
 				ID:     pgtype.UUID{Bytes: cohortID, Valid: true},
 				Status: string(cohort.CohortStatusActive),
 			}).
-			Return(db.Cohort{
+			Return(db.UpdateCohortStatusRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusActive),
@@ -476,6 +496,7 @@ func TestService_Deactivate(t *testing.T) {
 	svc := cohort.NewService(mockQuerier, mockProducer)
 
 	cohortID := uuid.New()
+	projectID := uuid.New()
 	now := time.Now().UTC()
 	rules := cohort.Rules{Operator: cohort.OperatorAND, Conditions: []cohort.Condition{}}
 	rulesJSON, _ := json.Marshal(rules)
@@ -486,8 +507,9 @@ func TestService_Deactivate(t *testing.T) {
 				ID:     pgtype.UUID{Bytes: cohortID, Valid: true},
 				Status: string(cohort.CohortStatusInactive),
 			}).
-			Return(db.Cohort{
+			Return(db.UpdateCohortStatusRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusInactive),
@@ -512,7 +534,7 @@ func TestService_Deactivate(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			UpdateCohortStatus(gomock.Any(), gomock.Any()).
-			Return(db.Cohort{}, errors.New("not found"))
+			Return(db.UpdateCohortStatusRow{}, errors.New("not found"))
 
 		_, err := svc.Deactivate(context.Background(), cohortID)
 		if !errors.Is(err, cohort.ErrCohortNotFound) {
@@ -569,6 +591,7 @@ func TestService_TriggerRecompute(t *testing.T) {
 	svc := cohort.NewService(mockQuerier, nil)
 
 	cohortID := uuid.New()
+	projectID := uuid.New()
 	now := time.Now().UTC()
 	rules := cohort.Rules{Operator: cohort.OperatorAND, Conditions: []cohort.Condition{{Type: cohort.ConditionTypeEvent, EventName: "purchase"}}}
 	rulesJSON, _ := json.Marshal(rules)
@@ -579,8 +602,9 @@ func TestService_TriggerRecompute(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusActive),
@@ -605,7 +629,7 @@ func TestService_TriggerRecompute(t *testing.T) {
 		notFoundID := uuid.New()
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: notFoundID, Valid: true}).
-			Return(db.Cohort{}, errors.New("not found"))
+			Return(db.GetCohortRow{}, errors.New("not found"))
 
 		_, err := svc.TriggerRecompute(context.Background(), notFoundID, false)
 		if !errors.Is(err, cohort.ErrCohortNotFound) {
@@ -617,8 +641,9 @@ func TestService_TriggerRecompute(t *testing.T) {
 		svcNoWorker := cohort.NewService(mockQuerier, nil)
 		mockQuerier.EXPECT().
 			GetCohort(gomock.Any(), pgtype.UUID{Bytes: cohortID, Valid: true}).
-			Return(db.Cohort{
+			Return(db.GetCohortRow{
 				ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+				ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 				Name:      "Test Cohort",
 				Rules:     rulesJSON,
 				Status:    string(cohort.CohortStatusActive),
@@ -653,6 +678,7 @@ func TestService_ListActive(t *testing.T) {
 
 	mockQuerier := mocks.NewMockQuerier(ctrl)
 	svc := cohort.NewService(mockQuerier, nil)
+	projectID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
 		now := time.Now().UTC()
@@ -662,10 +688,11 @@ func TestService_ListActive(t *testing.T) {
 		cohortID := uuid.New()
 
 		mockQuerier.EXPECT().
-			ListActiveCohorts(gomock.Any()).
-			Return([]db.Cohort{
+			ListActiveCohorts(gomock.Any(), gomock.Any()).
+			Return([]db.ListActiveCohortsRow{
 				{
 					ID:        pgtype.UUID{Bytes: cohortID, Valid: true},
+					ProjectID: pgtype.UUID{Bytes: projectID, Valid: true},
 					Name:      "Active Cohort",
 					Rules:     rulesJSON,
 					Status:    string(cohort.CohortStatusActive),
@@ -675,7 +702,7 @@ func TestService_ListActive(t *testing.T) {
 				},
 			}, nil)
 
-		cohorts, err := svc.ListActive(context.Background())
+		cohorts, err := svc.ListActive(context.Background(), projectID)
 		if err != nil {
 			t.Errorf("ListActive() unexpected error: %v", err)
 		}
@@ -689,10 +716,10 @@ func TestService_ListActive(t *testing.T) {
 
 	t.Run("database error", func(t *testing.T) {
 		mockQuerier.EXPECT().
-			ListActiveCohorts(gomock.Any()).
+			ListActiveCohorts(gomock.Any(), gomock.Any()).
 			Return(nil, errors.New("database error"))
 
-		_, err := svc.ListActive(context.Background())
+		_, err := svc.ListActive(context.Background(), projectID)
 		if err == nil {
 			t.Error("ListActive() expected error for database failure")
 		}

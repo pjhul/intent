@@ -42,41 +42,86 @@ func (m *MockQuerier) EXPECT() *MockQuerierMockRecorder {
 	return m.recorder
 }
 
-// CountCohorts mocks base method.
-func (m *MockQuerier) CountCohorts(ctx context.Context) (int64, error) {
+// CountAllProjects mocks base method.
+func (m *MockQuerier) CountAllProjects(ctx context.Context) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CountCohorts", ctx)
+	ret := m.ctrl.Call(m, "CountAllProjects", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountAllProjects indicates an expected call of CountAllProjects.
+func (mr *MockQuerierMockRecorder) CountAllProjects(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountAllProjects", reflect.TypeOf((*MockQuerier)(nil).CountAllProjects), ctx)
+}
+
+// CountCohorts mocks base method.
+func (m *MockQuerier) CountCohorts(ctx context.Context, projectID pgtype.UUID) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountCohorts", ctx, projectID)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CountCohorts indicates an expected call of CountCohorts.
-func (mr *MockQuerierMockRecorder) CountCohorts(ctx any) *gomock.Call {
+func (mr *MockQuerierMockRecorder) CountCohorts(ctx, projectID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCohorts", reflect.TypeOf((*MockQuerier)(nil).CountCohorts), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCohorts", reflect.TypeOf((*MockQuerier)(nil).CountCohorts), ctx, projectID)
 }
 
 // CountCohortsByStatus mocks base method.
-func (m *MockQuerier) CountCohortsByStatus(ctx context.Context, status string) (int64, error) {
+func (m *MockQuerier) CountCohortsByStatus(ctx context.Context, arg db.CountCohortsByStatusParams) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CountCohortsByStatus", ctx, status)
+	ret := m.ctrl.Call(m, "CountCohortsByStatus", ctx, arg)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CountCohortsByStatus indicates an expected call of CountCohortsByStatus.
-func (mr *MockQuerierMockRecorder) CountCohortsByStatus(ctx, status any) *gomock.Call {
+func (mr *MockQuerierMockRecorder) CountCohortsByStatus(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCohortsByStatus", reflect.TypeOf((*MockQuerier)(nil).CountCohortsByStatus), ctx, status)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountCohortsByStatus", reflect.TypeOf((*MockQuerier)(nil).CountCohortsByStatus), ctx, arg)
+}
+
+// CountOrganizations mocks base method.
+func (m *MockQuerier) CountOrganizations(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountOrganizations", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountOrganizations indicates an expected call of CountOrganizations.
+func (mr *MockQuerierMockRecorder) CountOrganizations(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountOrganizations", reflect.TypeOf((*MockQuerier)(nil).CountOrganizations), ctx)
+}
+
+// CountProjects mocks base method.
+func (m *MockQuerier) CountProjects(ctx context.Context, organizationID pgtype.UUID) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountProjects", ctx, organizationID)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountProjects indicates an expected call of CountProjects.
+func (mr *MockQuerierMockRecorder) CountProjects(ctx, organizationID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountProjects", reflect.TypeOf((*MockQuerier)(nil).CountProjects), ctx, organizationID)
 }
 
 // CreateCohort mocks base method.
-func (m *MockQuerier) CreateCohort(ctx context.Context, arg db.CreateCohortParams) (db.Cohort, error) {
+func (m *MockQuerier) CreateCohort(ctx context.Context, arg db.CreateCohortParams) (db.CreateCohortRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateCohort", ctx, arg)
-	ret0, _ := ret[0].(db.Cohort)
+	ret0, _ := ret[0].(db.CreateCohortRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -85,6 +130,36 @@ func (m *MockQuerier) CreateCohort(ctx context.Context, arg db.CreateCohortParam
 func (mr *MockQuerierMockRecorder) CreateCohort(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCohort", reflect.TypeOf((*MockQuerier)(nil).CreateCohort), ctx, arg)
+}
+
+// CreateOrganization mocks base method.
+func (m *MockQuerier) CreateOrganization(ctx context.Context, arg db.CreateOrganizationParams) (db.Organization, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOrganization", ctx, arg)
+	ret0, _ := ret[0].(db.Organization)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateOrganization indicates an expected call of CreateOrganization.
+func (mr *MockQuerierMockRecorder) CreateOrganization(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrganization", reflect.TypeOf((*MockQuerier)(nil).CreateOrganization), ctx, arg)
+}
+
+// CreateProject mocks base method.
+func (m *MockQuerier) CreateProject(ctx context.Context, arg db.CreateProjectParams) (db.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateProject", ctx, arg)
+	ret0, _ := ret[0].(db.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateProject indicates an expected call of CreateProject.
+func (mr *MockQuerierMockRecorder) CreateProject(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProject", reflect.TypeOf((*MockQuerier)(nil).CreateProject), ctx, arg)
 }
 
 // DeleteCohort mocks base method.
@@ -101,11 +176,39 @@ func (mr *MockQuerierMockRecorder) DeleteCohort(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCohort", reflect.TypeOf((*MockQuerier)(nil).DeleteCohort), ctx, id)
 }
 
+// DeleteOrganization mocks base method.
+func (m *MockQuerier) DeleteOrganization(ctx context.Context, id pgtype.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteOrganization", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteOrganization indicates an expected call of DeleteOrganization.
+func (mr *MockQuerierMockRecorder) DeleteOrganization(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOrganization", reflect.TypeOf((*MockQuerier)(nil).DeleteOrganization), ctx, id)
+}
+
+// DeleteProject mocks base method.
+func (m *MockQuerier) DeleteProject(ctx context.Context, id pgtype.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProject", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProject indicates an expected call of DeleteProject.
+func (mr *MockQuerierMockRecorder) DeleteProject(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProject", reflect.TypeOf((*MockQuerier)(nil).DeleteProject), ctx, id)
+}
+
 // GetCohort mocks base method.
-func (m *MockQuerier) GetCohort(ctx context.Context, id pgtype.UUID) (db.Cohort, error) {
+func (m *MockQuerier) GetCohort(ctx context.Context, id pgtype.UUID) (db.GetCohortRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCohort", ctx, id)
-	ret0, _ := ret[0].(db.Cohort)
+	ret0, _ := ret[0].(db.GetCohortRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -117,25 +220,25 @@ func (mr *MockQuerierMockRecorder) GetCohort(ctx, id any) *gomock.Call {
 }
 
 // GetCohortByName mocks base method.
-func (m *MockQuerier) GetCohortByName(ctx context.Context, name string) (db.Cohort, error) {
+func (m *MockQuerier) GetCohortByName(ctx context.Context, arg db.GetCohortByNameParams) (db.GetCohortByNameRow, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCohortByName", ctx, name)
-	ret0, _ := ret[0].(db.Cohort)
+	ret := m.ctrl.Call(m, "GetCohortByName", ctx, arg)
+	ret0, _ := ret[0].(db.GetCohortByNameRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCohortByName indicates an expected call of GetCohortByName.
-func (mr *MockQuerierMockRecorder) GetCohortByName(ctx, name any) *gomock.Call {
+func (mr *MockQuerierMockRecorder) GetCohortByName(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCohortByName", reflect.TypeOf((*MockQuerier)(nil).GetCohortByName), ctx, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCohortByName", reflect.TypeOf((*MockQuerier)(nil).GetCohortByName), ctx, arg)
 }
 
 // GetCohortsUpdatedAfter mocks base method.
-func (m *MockQuerier) GetCohortsUpdatedAfter(ctx context.Context, updatedAt pgtype.Timestamptz) ([]db.Cohort, error) {
+func (m *MockQuerier) GetCohortsUpdatedAfter(ctx context.Context, updatedAt pgtype.Timestamptz) ([]db.GetCohortsUpdatedAfterRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCohortsUpdatedAfter", ctx, updatedAt)
-	ret0, _ := ret[0].([]db.Cohort)
+	ret0, _ := ret[0].([]db.GetCohortsUpdatedAfterRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -146,26 +249,116 @@ func (mr *MockQuerierMockRecorder) GetCohortsUpdatedAfter(ctx, updatedAt any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCohortsUpdatedAfter", reflect.TypeOf((*MockQuerier)(nil).GetCohortsUpdatedAfter), ctx, updatedAt)
 }
 
-// ListActiveCohorts mocks base method.
-func (m *MockQuerier) ListActiveCohorts(ctx context.Context) ([]db.Cohort, error) {
+// GetOrganization mocks base method.
+func (m *MockQuerier) GetOrganization(ctx context.Context, id pgtype.UUID) (db.Organization, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListActiveCohorts", ctx)
-	ret0, _ := ret[0].([]db.Cohort)
+	ret := m.ctrl.Call(m, "GetOrganization", ctx, id)
+	ret0, _ := ret[0].(db.Organization)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrganization indicates an expected call of GetOrganization.
+func (mr *MockQuerierMockRecorder) GetOrganization(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrganization", reflect.TypeOf((*MockQuerier)(nil).GetOrganization), ctx, id)
+}
+
+// GetOrganizationBySlug mocks base method.
+func (m *MockQuerier) GetOrganizationBySlug(ctx context.Context, slug string) (db.Organization, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrganizationBySlug", ctx, slug)
+	ret0, _ := ret[0].(db.Organization)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrganizationBySlug indicates an expected call of GetOrganizationBySlug.
+func (mr *MockQuerierMockRecorder) GetOrganizationBySlug(ctx, slug any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrganizationBySlug", reflect.TypeOf((*MockQuerier)(nil).GetOrganizationBySlug), ctx, slug)
+}
+
+// GetProject mocks base method.
+func (m *MockQuerier) GetProject(ctx context.Context, id pgtype.UUID) (db.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProject", ctx, id)
+	ret0, _ := ret[0].(db.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProject indicates an expected call of GetProject.
+func (mr *MockQuerierMockRecorder) GetProject(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProject", reflect.TypeOf((*MockQuerier)(nil).GetProject), ctx, id)
+}
+
+// GetProjectBySlug mocks base method.
+func (m *MockQuerier) GetProjectBySlug(ctx context.Context, arg db.GetProjectBySlugParams) (db.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectBySlug", ctx, arg)
+	ret0, _ := ret[0].(db.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectBySlug indicates an expected call of GetProjectBySlug.
+func (mr *MockQuerierMockRecorder) GetProjectBySlug(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectBySlug", reflect.TypeOf((*MockQuerier)(nil).GetProjectBySlug), ctx, arg)
+}
+
+// ListActiveCohorts mocks base method.
+func (m *MockQuerier) ListActiveCohorts(ctx context.Context, projectID pgtype.UUID) ([]db.ListActiveCohortsRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListActiveCohorts", ctx, projectID)
+	ret0, _ := ret[0].([]db.ListActiveCohortsRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListActiveCohorts indicates an expected call of ListActiveCohorts.
-func (mr *MockQuerierMockRecorder) ListActiveCohorts(ctx any) *gomock.Call {
+func (mr *MockQuerierMockRecorder) ListActiveCohorts(ctx, projectID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListActiveCohorts", reflect.TypeOf((*MockQuerier)(nil).ListActiveCohorts), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListActiveCohorts", reflect.TypeOf((*MockQuerier)(nil).ListActiveCohorts), ctx, projectID)
+}
+
+// ListAllActiveCohorts mocks base method.
+func (m *MockQuerier) ListAllActiveCohorts(ctx context.Context) ([]db.ListAllActiveCohortsRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAllActiveCohorts", ctx)
+	ret0, _ := ret[0].([]db.ListAllActiveCohortsRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAllActiveCohorts indicates an expected call of ListAllActiveCohorts.
+func (mr *MockQuerierMockRecorder) ListAllActiveCohorts(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllActiveCohorts", reflect.TypeOf((*MockQuerier)(nil).ListAllActiveCohorts), ctx)
+}
+
+// ListAllProjects mocks base method.
+func (m *MockQuerier) ListAllProjects(ctx context.Context, arg db.ListAllProjectsParams) ([]db.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAllProjects", ctx, arg)
+	ret0, _ := ret[0].([]db.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAllProjects indicates an expected call of ListAllProjects.
+func (mr *MockQuerierMockRecorder) ListAllProjects(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllProjects", reflect.TypeOf((*MockQuerier)(nil).ListAllProjects), ctx, arg)
 }
 
 // ListCohorts mocks base method.
-func (m *MockQuerier) ListCohorts(ctx context.Context, arg db.ListCohortsParams) ([]db.Cohort, error) {
+func (m *MockQuerier) ListCohorts(ctx context.Context, arg db.ListCohortsParams) ([]db.ListCohortsRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCohorts", ctx, arg)
-	ret0, _ := ret[0].([]db.Cohort)
+	ret0, _ := ret[0].([]db.ListCohortsRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -177,10 +370,10 @@ func (mr *MockQuerierMockRecorder) ListCohorts(ctx, arg any) *gomock.Call {
 }
 
 // ListCohortsByStatus mocks base method.
-func (m *MockQuerier) ListCohortsByStatus(ctx context.Context, arg db.ListCohortsByStatusParams) ([]db.Cohort, error) {
+func (m *MockQuerier) ListCohortsByStatus(ctx context.Context, arg db.ListCohortsByStatusParams) ([]db.ListCohortsByStatusRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCohortsByStatus", ctx, arg)
-	ret0, _ := ret[0].([]db.Cohort)
+	ret0, _ := ret[0].([]db.ListCohortsByStatusRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -191,11 +384,41 @@ func (mr *MockQuerierMockRecorder) ListCohortsByStatus(ctx, arg any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCohortsByStatus", reflect.TypeOf((*MockQuerier)(nil).ListCohortsByStatus), ctx, arg)
 }
 
+// ListOrganizations mocks base method.
+func (m *MockQuerier) ListOrganizations(ctx context.Context, arg db.ListOrganizationsParams) ([]db.Organization, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListOrganizations", ctx, arg)
+	ret0, _ := ret[0].([]db.Organization)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListOrganizations indicates an expected call of ListOrganizations.
+func (mr *MockQuerierMockRecorder) ListOrganizations(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrganizations", reflect.TypeOf((*MockQuerier)(nil).ListOrganizations), ctx, arg)
+}
+
+// ListProjects mocks base method.
+func (m *MockQuerier) ListProjects(ctx context.Context, arg db.ListProjectsParams) ([]db.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjects", ctx, arg)
+	ret0, _ := ret[0].([]db.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjects indicates an expected call of ListProjects.
+func (mr *MockQuerierMockRecorder) ListProjects(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjects", reflect.TypeOf((*MockQuerier)(nil).ListProjects), ctx, arg)
+}
+
 // UpdateCohort mocks base method.
-func (m *MockQuerier) UpdateCohort(ctx context.Context, arg db.UpdateCohortParams) (db.Cohort, error) {
+func (m *MockQuerier) UpdateCohort(ctx context.Context, arg db.UpdateCohortParams) (db.UpdateCohortRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateCohort", ctx, arg)
-	ret0, _ := ret[0].(db.Cohort)
+	ret0, _ := ret[0].(db.UpdateCohortRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -207,10 +430,10 @@ func (mr *MockQuerierMockRecorder) UpdateCohort(ctx, arg any) *gomock.Call {
 }
 
 // UpdateCohortStatus mocks base method.
-func (m *MockQuerier) UpdateCohortStatus(ctx context.Context, arg db.UpdateCohortStatusParams) (db.Cohort, error) {
+func (m *MockQuerier) UpdateCohortStatus(ctx context.Context, arg db.UpdateCohortStatusParams) (db.UpdateCohortStatusRow, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateCohortStatus", ctx, arg)
-	ret0, _ := ret[0].(db.Cohort)
+	ret0, _ := ret[0].(db.UpdateCohortStatusRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -219,4 +442,34 @@ func (m *MockQuerier) UpdateCohortStatus(ctx context.Context, arg db.UpdateCohor
 func (mr *MockQuerierMockRecorder) UpdateCohortStatus(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCohortStatus", reflect.TypeOf((*MockQuerier)(nil).UpdateCohortStatus), ctx, arg)
+}
+
+// UpdateOrganization mocks base method.
+func (m *MockQuerier) UpdateOrganization(ctx context.Context, arg db.UpdateOrganizationParams) (db.Organization, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateOrganization", ctx, arg)
+	ret0, _ := ret[0].(db.Organization)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateOrganization indicates an expected call of UpdateOrganization.
+func (mr *MockQuerierMockRecorder) UpdateOrganization(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOrganization", reflect.TypeOf((*MockQuerier)(nil).UpdateOrganization), ctx, arg)
+}
+
+// UpdateProject mocks base method.
+func (m *MockQuerier) UpdateProject(ctx context.Context, arg db.UpdateProjectParams) (db.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProject", ctx, arg)
+	ret0, _ := ret[0].(db.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProject indicates an expected call of UpdateProject.
+func (mr *MockQuerierMockRecorder) UpdateProject(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProject", reflect.TypeOf((*MockQuerier)(nil).UpdateProject), ctx, arg)
 }

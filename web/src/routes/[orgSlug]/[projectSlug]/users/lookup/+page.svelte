@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+
+	$: orgSlug = $page.params.orgSlug;
+	$: projectSlug = $page.params.projectSlug;
 
 	let userId = '';
 
 	function handleSubmit() {
 		if (userId.trim()) {
-			goto(`/users/${encodeURIComponent(userId.trim())}`);
+			goto(`/${orgSlug}/${projectSlug}/users/${encodeURIComponent(userId.trim())}`);
 		}
 	}
 </script>

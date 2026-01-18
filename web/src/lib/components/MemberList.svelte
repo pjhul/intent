@@ -4,6 +4,8 @@
 	import { format } from 'date-fns';
 
 	export let cohortId: string;
+	export let orgSlug: string;
+	export let projectSlug: string;
 
 	let members: Member[] = [];
 	let loading = false;
@@ -19,7 +21,7 @@
 		loading = true;
 		error = null;
 		try {
-			const response = await getCohortMembers(cohortId, page, pageSize);
+			const response = await getCohortMembers(orgSlug, projectSlug, cohortId, page, pageSize);
 			members = response.data || [];
 			total = response.total;
 		} catch (e) {
@@ -34,7 +36,7 @@
 		page++;
 		loading = true;
 		try {
-			const response = await getCohortMembers(cohortId, page, pageSize);
+			const response = await getCohortMembers(orgSlug, projectSlug, cohortId, page, pageSize);
 			members = [...members, ...(response.data || [])];
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load more members';
@@ -83,7 +85,7 @@
 				{#each members as member}
 					<tr class="hover:bg-gray-50">
 						<td class="px-4 py-3 text-sm font-mono text-gray-900">
-							<a href="/users/{member.user_id}" class="hover:text-blue-600 hover:underline">
+							<a href="/{orgSlug}/{projectSlug}/users/{member.user_id}" class="hover:text-blue-600 hover:underline">
 								{member.user_id}
 							</a>
 						</td>

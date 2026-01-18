@@ -12,6 +12,9 @@ COPY go.mod go.sum ./
 # Download dependencies
 RUN go mod download
 
+# Copy migrations first (separate layer for better cache invalidation)
+COPY internal/infrastructure/migrations/ internal/infrastructure/migrations/
+
 # Copy source code
 COPY . .
 
