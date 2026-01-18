@@ -290,13 +290,17 @@ func (a *membershipRepoAdapter) GetByCohortAndUser(ctx context.Context, cohortID
 	if err != nil {
 		return nil, err
 	}
+	status := int8(-1)
+	if m.IsMember {
+		status = 1
+	}
 	return &membership.StoredMembership{
 		CohortID:  m.CohortID,
 		UserID:    m.UserID,
-		Status:    int8(m.Status),
+		Status:    status,
 		JoinedAt:  m.JoinedAt,
-		UpdatedAt: m.UpdatedAt,
-		Version:   m.Version,
+		UpdatedAt: m.JoinedAt, // CollapsingMergeTree doesn't track updated_at
+		Version:   0,
 	}, nil
 }
 

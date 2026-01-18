@@ -40,19 +40,17 @@ func (i *MembershipInserter) InsertBatch(ctx context.Context, changes []Membersh
 // insertCurrentBatch inserts membership state into cohort_membership_current
 func (i *MembershipInserter) insertCurrentBatch(ctx context.Context, changes []MembershipChange) error {
 	batch, err := i.client.PrepareBatch(ctx, `
-		INSERT INTO cohort_membership_current (cohort_id, user_id, joined_at, updated_at)
+		INSERT INTO cohort_membership_current (cohort_id, user_id, sign, joined_at)
 	`)
 	if err != nil {
 		return err
 	}
 
 	for _, c := range changes {
-		// Only insert for members (is_member = 1)
-		if c.IsMember == 1 {
-			joinedAt := c.Timestamp
-			if err := batch.Append(c.CohortID, c.UserID, joinedAt, c.Timestamp); err != nil {
-				return err
-			}
+		// CollapsingMergeTree: sign = 1 for join, -1 for leave
+		// NewStatus already has the right values: 1 = in, -1 = out
+		if err := batch.Append(c.CohortID, c.UserID, c.NewStatus, c.ChangedAt); err != nil {
+			return err
 		}
 	}
 
@@ -62,27 +60,19 @@ func (i *MembershipInserter) insertCurrentBatch(ctx context.Context, changes []M
 // insertChangelogBatch inserts all membership changes into cohort_membership_changelog
 func (i *MembershipInserter) insertChangelogBatch(ctx context.Context, changes []MembershipChange) error {
 	batch, err := i.client.PrepareBatch(ctx, `
-		INSERT INTO cohort_membership_changelog (cohort_id, user_id, prev_status, new_status, changed_at)
+		INSERT INTO cohort_membership_changelog (cohort_id, user_id, prev_status, new_status, changed_at, trigger_event_id)
 	`)
 	if err != nil {
 		return err
 	}
 
 	for _, c := range changes {
-		// prev_status is unknown from Kafka message, we use 0 as placeholder
-		// new_status: 1 for member, -1 for non-member
-		prevStatus := int8(0)
-		newStatus := int8(1)
-		if c.IsMember == 0 {
-			newStatus = -1
-		}
-
-		changedAt := c.Timestamp
+		changedAt := c.ChangedAt
 		if changedAt.IsZero() {
 			changedAt = time.Now().UTC()
 		}
 
-		if err := batch.Append(c.CohortID, c.UserID, prevStatus, newStatus, changedAt); err != nil {
+		if err := batch.Append(c.CohortID, c.UserID, c.PrevStatus, c.NewStatus, changedAt, c.TriggerEvent); err != nil {
 			return err
 		}
 	}
