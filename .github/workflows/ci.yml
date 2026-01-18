@@ -43,3 +43,41 @@ jobs:
         with:
           files: coverage.out
           fail_ci_if_error: false
+
+  inserter-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.3'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Install mockgen
+        run: go install go.uber.org/mock/mockgen@v0.5.0
+
+      - name: Generate mocks
+        run: make generate-mocks
+
+      - name: Run tests with coverage
+        run: go test -v -race -coverprofile=coverage-inserter.out -covermode=atomic ./internal/inserter/...
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage-inserter.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Inserter package coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below 50% threshold"
+            exit 1
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage-inserter.out
+          flags: inserter
+          fail_ci_if_error: false

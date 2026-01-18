@@ -9,11 +9,16 @@ import (
 
 // MembershipInserter handles batch insertion of membership changes into ClickHouse
 type MembershipInserter struct {
-	client *clickhouse.Client
+	client BatchPreparer
 }
 
 // NewMembershipInserter creates a new membership inserter
 func NewMembershipInserter(client *clickhouse.Client) *MembershipInserter {
+	return &MembershipInserter{client: &clickhouseBatchPreparer{client: client}}
+}
+
+// NewMembershipInserterWithClient creates a new membership inserter with a custom BatchPreparer (for testing)
+func NewMembershipInserterWithClient(client BatchPreparer) *MembershipInserter {
 	return &MembershipInserter{client: client}
 }
 
